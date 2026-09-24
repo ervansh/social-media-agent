@@ -1,7 +1,14 @@
 import json
+from pathlib import Path
 
 import streamlit as st
 
+from social_media_agent.config.settings import (
+    settings,
+)
+from social_media_agent.models.generated_assets import (
+    GeneratedAssetBundle,
+)
 from social_media_agent.persistence.artifact_types import (
     ArtifactType,
 )
@@ -11,6 +18,144 @@ from social_media_agent.persistence.run_status import (
 from social_media_agent.ui.dependencies import (
     get_persistence_service,
 )
+
+
+def _resolve_generated_asset_path(
+    storage_key: str,
+) -> Path | None:
+
+    root = Path(
+        settings.generated_assets_dir
+    ).resolve()
+
+    normalized = (
+        storage_key
+        .replace("\\", "/")
+    )
+
+    parts = [
+        part
+        for part in normalized.split("/")
+        if part
+    ]
+
+    if (
+        not parts
+        or any(
+            part in {".", ".."}
+            for part in parts
+        )
+    ):
+        return None
+
+    candidate = (
+        root
+        .joinpath(*parts)
+        .resolve()
+    )
+
+    try:
+        candidate.relative_to(
+            root
+        )
+
+    except ValueError:
+        return None
+
+    if not candidate.is_file():
+        return None
+
+    return candidate
+
+
+def _render_generated_media_preview(
+    persistence,
+    run_id: str,
+) -> None:
+
+    payload = (
+        persistence.get_latest_payload(
+            run_id,
+            ArtifactType.GENERATED_ASSETS,
+        )
+    )
+
+    if payload is None:
+        return
+
+    bundle = (
+        GeneratedAssetBundle
+        .model_validate(
+            payload
+        )
+    )
+
+    instagram_assets = [
+        asset
+        for asset in bundle.images
+        if asset.platform
+        == "instagram"
+    ]
+
+    if not instagram_assets:
+        return
+
+    st.divider()
+
+    st.subheader(
+        "Generated Instagram Media"
+    )
+
+    st.caption(
+        "Preview the actual generated JPEG "
+        "assets before approving this run."
+    )
+
+    columns = st.columns(3)
+
+    for index, asset in enumerate(
+        instagram_assets
+    ):
+
+        target = columns[
+            index % len(columns)
+        ]
+
+        file_path = (
+            _resolve_generated_asset_path(
+                asset.storage_key
+            )
+        )
+
+        with target:
+
+            if file_path is None:
+
+                st.warning(
+                    "Generated asset file "
+                    "is unavailable."
+                )
+
+                st.caption(
+                    asset.storage_key
+                )
+
+                continue
+
+            st.image(
+                str(file_path),
+                caption=(
+                    f"{asset.asset_type} "
+                    f"({asset.generated_width}×"
+                    f"{asset.generated_height})"
+                ),
+                use_container_width=True,
+            )
+
+            st.caption(
+                f"Provider: {asset.provider} "
+                f"· Model: {asset.model}"
+            )
 
 
 def render():
@@ -169,6 +314,11 @@ def render():
                     )
 
                     st.rerun()
+
+    _render_generated_media_preview(
+        persistence,
+        run.id,
+    )
 
     st.divider()
 
