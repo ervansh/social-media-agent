@@ -1,5 +1,3 @@
-import pytest
-
 from social_media_agent.agents.master_content_agent import (
     MasterContentAgent,
 )
@@ -10,7 +8,6 @@ from social_media_agent.models.content_strategy import (
     ContentStrategy,
 )
 from social_media_agent.models.master_content import (
-    MasterContent,
     MasterContentDraft,
     MasterSection,
 )
@@ -42,11 +39,8 @@ class CapturingLLM:
         )
 
         return MasterContentDraft(
-            title="Revised",
-            hook=(
-                "Some tools demonstrate "
-                "self-healing locators."
-            ),
+            title="Grounded content",
+            hook="Review documented capability.",
             core_message=(
                 "Some tools demonstrate "
                 "self-healing locators."
@@ -55,7 +49,7 @@ class CapturingLLM:
                 MasterSection(
                     heading="Evidence",
                     purpose=(
-                        "Stay within evidence."
+                        "Review documented behavior."
                     ),
                     key_points=[
                         (
@@ -67,12 +61,12 @@ class CapturingLLM:
             ],
             key_takeaways=[
                 (
-                    "Evaluate demonstrated "
-                    "capabilities carefully."
+                    "Verify tool behavior in "
+                    "your own workflow."
                 )
             ],
             call_to_action=(
-                "Review the evidence."
+                "Review the documentation."
             ),
         )
 
@@ -108,10 +102,10 @@ def build_inputs():
     )
 
     idea = ContentIdea(
-        title="Self-healing tests",
+        title="Self-healing mistakes",
         hook=(
-            "Do self-healing tests "
-            "miss defects?"
+            "Self-healing tests may "
+            "miss defects."
         ),
         angle=(
             "Explore practical limits."
@@ -133,7 +127,7 @@ def build_inputs():
         content_depth="medium",
         story_structure=[
             "Capability",
-            "Limits",
+            "Evaluation",
         ],
         must_include_points=[
             (
@@ -147,54 +141,19 @@ def build_inputs():
         ),
     )
 
-    previous = MasterContent(
-        title="Self-healing tests",
-        hook=(
-            "AI cannot fix everything."
-        ),
-        core_message=(
-            "Self-healing tests may "
-            "miss defects."
-        ),
-        sections=[
-            MasterSection(
-                heading="Limits",
-                purpose="Discuss limits",
-                key_points=[
-                    (
-                        "Self-healing is not "
-                        "widely adopted."
-                    )
-                ],
-            )
-        ],
-        key_takeaways=[
-            (
-                "Human review is always "
-                "required."
-            )
-        ],
-        call_to_action=(
-            "Review your workflow."
-        ),
-        sources=[],
-    )
-
     return (
         research,
         idea,
         strategy,
-        previous,
     )
 
 
-def test_revision_uses_previous_master_and_not_strategy_facts():
+def test_master_prompt_marks_upstream_content_as_non_evidence():
 
     (
         research,
         idea,
         strategy,
-        previous,
     ) = build_inputs()
 
     llm = CapturingLLM()
@@ -203,68 +162,59 @@ def test_revision_uses_previous_master_and_not_strategy_facts():
         llm=llm
     )
 
-    result = agent.run(
+    agent.run(
         research=research,
         selected_idea=idea,
         strategy=strategy,
-        feedback=(
-            "[ERROR]\n"
-            "Claim: Self-healing tests "
-            "may miss defects.\n"
-            "Reason: Unsupported."
-        ),
-        previous_master_content=(
-            previous
-        ),
     )
 
-    assert result.title == "Revised"
-
     assert (
-        "PREVIOUS MASTER CONTENT"
+        "SOURCE EVIDENCE is the factual ceiling."
         in llm.prompt
     )
 
     assert (
-        "Self-healing is not widely "
-        "adopted."
+        "approved idea is creative direction"
         in llm.prompt
     )
 
     assert (
-        "Self-healing tests may miss "
-        "defects and create false confidence."
-        not in llm.prompt
-    )
-
-    assert (
-        "STYLE ONLY:"
+        "Strategy, approved idea, hook, angle"
         in llm.prompt
     )
 
 
-def test_revision_requires_previous_master():
+def test_master_prompt_forbids_invented_limitations():
 
     (
         research,
         idea,
         strategy,
-        _,
     ) = build_inputs()
 
+    llm = CapturingLLM()
+
     agent = MasterContentAgent(
-        llm=CapturingLLM()
+        llm=llm
     )
 
-    with pytest.raises(
-        ValueError,
-        match="previous_master_content",
-    ):
-        agent.run(
-            research=research,
-            selected_idea=idea,
-            strategy=strategy,
-            feedback=(
-                "[ERROR] Unsupported claim."
-            ),
-        )
+    agent.run(
+        research=research,
+        selected_idea=idea,
+        strategy=strategy,
+    )
+
+    assert (
+        "Do not invent:"
+        in llm.prompt
+    )
+
+    assert (
+        "- limitations"
+        in llm.prompt
+    )
+
+    assert (
+        "Self-healing may miss defects."
+        in llm.prompt
+    )
