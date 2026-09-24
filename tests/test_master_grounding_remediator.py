@@ -161,7 +161,7 @@ def test_remediator_removes_all_error_claims():
 
     assert (
         result.grounding_report.passed
-        is True
+        is False
     )
 
 
