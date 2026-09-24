@@ -315,17 +315,31 @@ Return structured JSON only.
     ) -> dict[int, str]:
 
         ordered_claims = [
+            master_content.title,
             master_content.hook,
             master_content.core_message,
         ]
 
         for section in master_content.sections:
+
+            ordered_claims.append(
+                section.heading
+            )
+
+            ordered_claims.append(
+                section.purpose
+            )
+
             ordered_claims.extend(
                 section.key_points
             )
 
         ordered_claims.extend(
             master_content.key_takeaways
+        )
+
+        ordered_claims.append(
+            master_content.call_to_action
         )
 
         claims: dict[int, str] = {}
