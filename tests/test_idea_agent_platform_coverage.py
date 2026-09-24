@@ -17,16 +17,19 @@ class FakeCoverageLLM:
         max_output_tokens=None,
     ):
 
+        schema_json = (
+            schema.model_json_schema()
+        )
+
         flexible_count = (
-            schema.model_fields[
+            schema_json[
+                "properties"
+            ][
                 "flexible_ideas"
-            ]
-            .metadata[0]
-            .min_length
-            if schema.model_fields[
-                "flexible_ideas"
-            ].metadata
-            else 0
+            ].get(
+                "minItems",
+                0,
+            )
         )
 
         flexible_ideas = [
