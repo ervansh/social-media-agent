@@ -66,6 +66,35 @@ class InstagramGraphClient:
             or requests.Session()
         )
 
+    def get_account_info(
+        self,
+    ) -> dict[str, Any]:
+
+        payload = self._request(
+            "GET",
+            self.instagram_user_id,
+            params={
+                "fields":
+                    "id,username,media_count",
+            },
+        )
+
+        account_id = payload.get(
+            "id"
+        )
+
+        username = payload.get(
+            "username"
+        )
+
+        if not account_id or not username:
+            raise InstagramGraphAPIError(
+                "Instagram account verification "
+                "did not return id and username."
+            )
+
+        return payload
+
     def create_image_container(
         self,
         *,
