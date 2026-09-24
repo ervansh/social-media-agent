@@ -3,6 +3,7 @@ import streamlit as st
 from social_media_agent.config.settings import settings
 from social_media_agent.persistence.run_status import RunStatus
 from social_media_agent.ui.dependencies import (
+    get_instagram_run_preflight_service,
     get_persistence_service,
     get_publishing_service,
 )
@@ -142,6 +143,146 @@ Current publishing support:
 - **YouTube** — live publishing not implemented yet; requires a final video file
 """
     )
+
+    # ==================================================
+    # Instagram Preflight
+    # ==================================================
+
+    instagram_payload = (
+        persistence.get_latest_payload(
+            selected_run_id,
+            "platform_content",
+            platform="instagram",
+        )
+    )
+
+    if instagram_payload is not None:
+
+        st.divider()
+
+        st.subheader(
+            "Instagram Preflight"
+        )
+
+        st.caption(
+            "Non-destructive readiness check. "
+            "No Instagram content is published."
+        )
+
+        st.write(
+            f"**Media resolver:** "
+            f"`{settings.media_url_provider}`"
+        )
+
+        if st.button(
+            "Run Instagram Preflight",
+            use_container_width=True,
+            key=(
+                "instagram_preflight_"
+                f"{selected_run_id}"
+            ),
+        ):
+
+            try:
+
+                with st.spinner(
+                    "Verifying Instagram account "
+                    "and generated media..."
+                ):
+
+                    preflight = (
+                        get_instagram_run_preflight_service()
+                    )
+
+                    result = preflight.verify(
+                        selected_run_id
+                    )
+
+            except Exception as exc:
+
+                st.error(
+                    "Instagram preflight failed: "
+                    f"{exc}"
+                )
+
+            else:
+
+                if result.ready:
+
+                    st.success(
+                        "Instagram is READY "
+                        "for controlled publishing."
+                    )
+
+                else:
+
+                    st.warning(
+                        "Instagram preflight "
+                        "completed but is not ready."
+                    )
+
+                col1, col2, col3 = (
+                    st.columns(3)
+                )
+
+                col1.metric(
+                    "Instagram User",
+                    result.username,
+                )
+
+                col2.metric(
+                    "Generated Media",
+                    len(
+                        result.media_storage_keys
+                    ),
+                )
+
+                col3.metric(
+                    "Verified URLs",
+                    len(
+                        result.media_urls
+                    ),
+                )
+
+                st.caption(
+                    "Instagram User ID: "
+                    f"{result.account_id}"
+                )
+
+                if (
+                    result.media_count
+                    is not None
+                ):
+                    st.caption(
+                        "Existing Instagram media: "
+                        f"{result.media_count}"
+                    )
+
+                with st.expander(
+                    "Verified Instagram media"
+                ):
+
+                    for index, (
+                        storage_key,
+                        media_url,
+                    ) in enumerate(
+                        zip(
+                            result.media_storage_keys,
+                            result.media_urls,
+                            strict=True,
+                        ),
+                        start=1,
+                    ):
+
+                        st.write(
+                            f"**{index}.** "
+                            f"`{storage_key}`"
+                        )
+
+                        st.code(
+                            media_url,
+                            language=None,
+                        )
 
     # ==================================================
     # Execute publishing
