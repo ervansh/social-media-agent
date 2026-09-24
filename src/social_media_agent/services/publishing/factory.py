@@ -35,10 +35,10 @@ def get_publishers():
     if mode == "live":
 
         return {
-            # YouTube remains simulated until
-            # its live integration is implemented.
-            "youtube": DryRunPublisher(),
-
+            # YouTube intentionally has no live
+            # publisher yet. PublishingService will
+            # report it as blocked instead of
+            # simulating success in live mode.
             "instagram": InstagramPublisher(
                 client=InstagramGraphClient(),
                 media_url_resolver=(
