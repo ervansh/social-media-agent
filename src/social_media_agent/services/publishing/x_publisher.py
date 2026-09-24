@@ -1,6 +1,8 @@
 import requests
 
-from social_media_agent.config.settings import settings
+from social_media_agent.config.settings import (
+    settings,
+)
 from social_media_agent.models.publication import (
     PublicationRequest,
     PublicationResult,
@@ -12,12 +14,6 @@ class XPublisher:
     CREATE_POST_ENDPOINT = "/tweets"
 
     def __init__(self):
-
-        if not settings.x_user_access_token:
-            raise ValueError(
-                "X_USER_ACCESS_TOKEN is required "
-                "for live X publishing."
-            )
 
         self.base_url = (
             settings.x_api_base_url.rstrip("/")
@@ -39,6 +35,12 @@ class XPublisher:
         if request.platform != "x":
             raise ValueError(
                 "XPublisher only supports X."
+            )
+
+        if not self.access_token:
+            raise ValueError(
+                "X_USER_ACCESS_TOKEN is required "
+                "for live X publishing."
             )
 
         text = request.payload.get(
