@@ -208,11 +208,12 @@ class MasterGroundingRemediator:
         ]
 
         report = GroundingReport(
-            passed=True,
+            passed=False,
             summary=(
-                "Unsupported factual claims were "
-                "removed deterministically. "
-                "Remaining warnings are non-blocking."
+                "Deterministic remediation was "
+                "applied. The corrected Master "
+                "Content requires a fresh grounding "
+                "review before it can pass."
             ),
             issues=remaining_warnings,
         )
