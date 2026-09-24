@@ -53,6 +53,9 @@ from social_media_agent.persistence.run_status import (
 from social_media_agent.services.quality.platform_validator import (
     PlatformValidator,
 )
+from social_media_agent.services.grounding.master_grounding_remediator import (
+    MasterGroundingRemediator,
+)
 
 from social_media_agent.workflows.content_creation_workflow import (
     build_content_creation_workflow,
@@ -925,52 +928,35 @@ class ContentPipelineService:
             )
 
         # ==================================================
-        # Grounding Revision Loop
+        # Grounding Revision
         # ==================================================
 
         grounding_retry = 0
 
-        while (
+        if (
             not grounding_report.passed
-            and grounding_retry < settings.max_grounding_retries
+            and grounding_retry
+            < settings.max_grounding_retries
         ):
 
-            actionable_issues = [
-                issue
-                for issue in grounding_report.issues
-                if issue.severity
-                in {
-                    "warning",
-                    "error",
-                }
-            ]
-
-            feedback_parts = []
-
-            for issue in actionable_issues:
-
-                feedback_parts.append(
-                    (
-                        f"[{issue.severity.upper()}]\n"
-                        f"Claim: {issue.claim}\n"
-                        f"Reason: {issue.reason}"
-                    )
+            remediation = (
+                MasterGroundingRemediator()
+                .remediate(
+                    master_content=(
+                        master_content
+                    ),
+                    grounding_report=(
+                        grounding_report
+                    ),
                 )
-
-            feedback = "\n\n".join(feedback_parts)
-
-            previous_master_content = (
-                master_content
             )
 
-            master_content = master_agent.run(
-                research=research,
-                selected_idea=selected_idea,
-                strategy=strategy,
-                feedback=feedback,
-                previous_master_content=(
-                    previous_master_content
-                ),
+            master_content = (
+                remediation.master_content
+            )
+
+            grounding_report = (
+                remediation.grounding_report
             )
 
             self.persistence.save_model(
@@ -979,19 +965,13 @@ class ContentPipelineService:
                 master_content,
             )
 
-            master_changed = True
-
-            grounding_report = grounding_agent.run(
-                research=research,
-                master_content=master_content,
-            )
-
             self.persistence.save_model(
                 run_id,
                 ArtifactType.GROUNDING_REPORT,
                 grounding_report,
             )
 
+            master_changed = True
             grounding_retry += 1
 
         # ==================================================
