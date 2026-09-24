@@ -45,6 +45,8 @@ class _SemanticGroundingReviewDraft(BaseModel):
 
 class GroundingReviewAgent:
 
+    REVIEW_VERSION = 2
+
     def __init__(
         self,
         llm: LLMProvider,
@@ -266,6 +268,7 @@ Return structured JSON only.
         )
 
         return GroundingReport(
+            review_version=self.REVIEW_VERSION,
             passed=passed,
             summary=semantic.summary,
             issues=issues,
