@@ -270,3 +270,115 @@ def test_remediator_keeps_master_structurally_valid():
     )
     assert remediated.key_takeaways
     assert remediated.call_to_action
+
+
+def test_remediator_replaces_previous_fallbacks_when_they_become_errors():
+
+    master = MasterContent(
+        title=(
+            "Evidence-Based AI Testing Review"
+        ),
+        hook=(
+            "Separate demonstrated AI testing "
+            "capabilities from assumptions before "
+            "relying on them in your workflow."
+        ),
+        core_message=(
+            "Use the available evidence to distinguish "
+            "demonstrated AI testing capabilities from "
+            "claims that still need verification."
+        ),
+        sections=[
+            MasterSection(
+                heading="A Balanced View",
+                purpose="Present retained points.",
+                key_points=[
+                    (
+                        "Some tools demonstrate "
+                        "self-healing capabilities."
+                    )
+                ],
+            )
+        ],
+        key_takeaways=[
+            (
+                "Review retained points carefully."
+            )
+        ],
+        call_to_action=(
+            "Review the documented capability against "
+            "your own testing requirements."
+        ),
+        sources=[],
+    )
+
+    error_values = [
+        master.title,
+        master.hook,
+        master.core_message,
+        master.call_to_action,
+    ]
+
+    report = GroundingReport(
+        review_version=2,
+        passed=False,
+        summary=(
+            "Previous fallback wording was "
+            "classified as unsupported."
+        ),
+        issues=[
+            GroundingIssue(
+                severity="error",
+                claim=value,
+                reason="Unsupported.",
+            )
+            for value in error_values
+        ],
+    )
+
+    result = (
+        MasterGroundingRemediator()
+        .remediate(
+            master_content=master,
+            grounding_report=report,
+        )
+    )
+
+    remediated = result.master_content
+
+    assert (
+        remediated.title
+        == "AI Testing Review"
+    )
+
+    assert (
+        remediated.hook
+        == "Review the points below."
+    )
+
+    assert (
+        remediated.core_message
+        == "Use the source-supported points below."
+    )
+
+    assert (
+        remediated.call_to_action
+        == "Review the points above."
+    )
+
+    payload = (
+        remediated
+        .model_dump_json()
+        .casefold()
+    )
+
+    for error_value in error_values:
+        assert (
+            error_value.casefold()
+            not in payload
+        )
+
+    assert (
+        result.grounding_report.passed
+        is False
+    )
