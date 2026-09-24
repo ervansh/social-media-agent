@@ -955,14 +955,17 @@ class ContentPipelineService:
                 remediation.master_content
             )
 
-            grounding_report = (
-                remediation.grounding_report
-            )
-
             self.persistence.save_model(
                 run_id,
                 ArtifactType.MASTER_CONTENT,
                 master_content,
+            )
+
+            grounding_report = (
+                grounding_agent.run(
+                    research=research,
+                    master_content=master_content,
+                )
             )
 
             self.persistence.save_model(
