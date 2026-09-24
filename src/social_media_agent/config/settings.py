@@ -79,7 +79,7 @@ class Settings(BaseSettings):
     )
 
     openai_image_quality: str = "medium"
-    openai_image_output_format: str = "png"
+    openai_image_output_format: str = "jpeg"
 
     publishing_mode: str = "dry_run"
 
