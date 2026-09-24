@@ -176,6 +176,9 @@ def build_content_creation_workflow(
                 ],
 
                 feedback=feedback,
+                previous_master_content=state[
+                    "master_content"
+                ],
             )
         )
 
