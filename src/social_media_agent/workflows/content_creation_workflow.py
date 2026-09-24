@@ -10,6 +10,9 @@ from social_media_agent.config.settings import (
 from social_media_agent.models.content_creation_state import (
     ContentCreationState,
 )
+from social_media_agent.services.grounding.master_grounding_remediator import (
+    MasterGroundingRemediator,
+)
 
 
 def build_content_creation_workflow(
@@ -127,57 +130,17 @@ def build_content_creation_workflow(
         state: ContentCreationState,
     ) -> dict:
 
-        report = state[
-            "grounding_report"
-        ]
-
-        # ----------------------------------------------
-        # Only warnings/errors should be fed back.
-        #
-        # SUPPORTED findings must NOT cause rewriting.
-        # ----------------------------------------------
-
-        actionable_issues = [
-            issue
-            for issue in report.issues
-            if issue.severity
-            in {
-                "warning",
-                "error",
-            }
-        ]
-
-        feedback_lines = []
-
-        for issue in actionable_issues:
-
-            feedback_lines.append(
-                (
-                    f"[{issue.severity.upper()}]\n"
-                    f"Claim: {issue.claim}\n"
-                    f"Reason: {issue.reason}"
-                )
-            )
-
-        feedback = "\n\n".join(
-            feedback_lines
+        remediator = (
+            MasterGroundingRemediator()
         )
 
-        master_content = (
-            master_content_agent.run(
-                research=state["research"],
-
-                selected_idea=state[
-                    "selected_idea"
-                ],
-
-                strategy=state[
-                    "strategy"
-                ],
-
-                feedback=feedback,
-                previous_master_content=state[
+        remediation = (
+            remediator.remediate(
+                master_content=state[
                     "master_content"
+                ],
+                grounding_report=state[
+                    "grounding_report"
                 ],
             )
         )
@@ -192,7 +155,10 @@ def build_content_creation_workflow(
 
         return {
             "master_content":
-                master_content,
+                remediation.master_content,
+
+            "grounding_report":
+                remediation.grounding_report,
 
             "grounding_retry_count":
                 retry_count,
@@ -304,7 +270,7 @@ def build_content_creation_workflow(
 
     graph.add_edge(
         "revise_master_content",
-        "grounding_review",
+        "grounding_passed",
     )
 
     graph.add_edge(
