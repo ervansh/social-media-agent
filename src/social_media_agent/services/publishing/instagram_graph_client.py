@@ -1,3 +1,4 @@
+import time
 from typing import Any
 
 import requests
@@ -14,6 +15,13 @@ class InstagramGraphAPIError(
 
 
 class InstagramGraphClient:
+
+    READY_STATUS = "FINISHED"
+
+    FAILED_STATUSES = {
+        "ERROR",
+        "EXPIRED",
+    }
 
     def __init__(
         self,
@@ -150,6 +158,81 @@ class InstagramGraphClient:
             context=(
                 "Instagram carousel container"
             ),
+        )
+
+    def get_container_status(
+        self,
+        container_id: str,
+    ) -> str:
+
+        if not container_id:
+            raise ValueError(
+                "container_id is required."
+            )
+
+        payload = self._request(
+            "GET",
+            container_id,
+            params={
+                "fields":
+                    "status_code,status",
+            },
+        )
+
+        return str(
+            payload.get(
+                "status_code",
+                "",
+            )
+        ).upper()
+
+    def wait_until_ready(
+        self,
+        container_id: str,
+    ) -> None:
+
+        max_attempts = (
+            settings
+            .instagram_container_max_poll_attempts
+        )
+
+        interval = (
+            settings
+            .instagram_container_poll_interval_seconds
+        )
+
+        for attempt in range(
+            1,
+            max_attempts + 1,
+        ):
+
+            status = (
+                self.get_container_status(
+                    container_id
+                )
+            )
+
+            if status == self.READY_STATUS:
+                return
+
+            if status in self.FAILED_STATUSES:
+                raise InstagramGraphAPIError(
+                    "Instagram media container "
+                    "processing failed. "
+                    f"container_id={container_id}, "
+                    f"status={status}"
+                )
+
+            if attempt < max_attempts:
+                time.sleep(
+                    interval
+                )
+
+        raise InstagramGraphAPIError(
+            "Instagram media container did "
+            "not become ready within the "
+            "configured polling limit. "
+            f"container_id={container_id}"
         )
 
     def publish_container(
