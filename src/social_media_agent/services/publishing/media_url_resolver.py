@@ -1,0 +1,89 @@
+import re
+from typing import Protocol
+from urllib.parse import quote
+
+from social_media_agent.config.settings import (
+    settings,
+)
+
+
+class MediaUrlResolver(Protocol):
+
+    def resolve(
+        self,
+        storage_key: str,
+    ) -> str:
+        ...
+
+
+class PublicBaseUrlMediaUrlResolver:
+
+    def __init__(
+        self,
+        base_url: str | None = None,
+    ):
+        self.base_url = (
+            base_url
+            if base_url is not None
+            else settings.public_media_base_url
+        )
+
+    def resolve(
+        self,
+        storage_key: str,
+    ) -> str:
+
+        if not self.base_url:
+            raise ValueError(
+                "PUBLIC_MEDIA_BASE_URL is required "
+                "for live media publishing."
+            )
+
+        if not storage_key or not storage_key.strip():
+            raise ValueError(
+                "Media storage key cannot be empty."
+            )
+
+        raw_key = storage_key.strip()
+
+        if (
+            raw_key.startswith(("/", "\\"))
+            or re.match(
+                r"^[a-zA-Z]:[\\/]",
+                raw_key,
+            )
+            or "://" in raw_key
+        ):
+            raise ValueError(
+                "Media storage key must be a "
+                "relative storage key."
+            )
+
+        normalized = raw_key.replace(
+            "\\",
+            "/",
+        )
+
+        parts = normalized.split("/")
+
+        if any(
+            part in {"", ".", ".."}
+            for part in parts
+        ):
+            raise ValueError(
+                "Media storage key contains "
+                "an invalid path segment."
+            )
+
+        encoded_key = "/".join(
+            quote(
+                part,
+                safe="-._~",
+            )
+            for part in parts
+        )
+
+        return (
+            f"{self.base_url.rstrip('/')}/"
+            f"{encoded_key}"
+        )
