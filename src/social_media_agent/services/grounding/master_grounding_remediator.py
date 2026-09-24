@@ -17,45 +17,52 @@ class MasterGroundingRemediationResult:
 
 class MasterGroundingRemediator:
 
-    SAFE_TITLE = (
-        "Evidence-Based AI Testing Review"
+    TITLE_FALLBACKS = (
+        "AI Testing Review",
+        "AI Testing Overview",
+        "AI Testing Notes",
     )
 
-    SAFE_HOOK = (
-        "Separate demonstrated AI testing "
-        "capabilities from assumptions before "
-        "relying on them in your workflow."
+    HOOK_FALLBACKS = (
+        "Review the points below.",
+        "Consider the points below.",
+        "Use the points below as a review guide.",
     )
 
-    SAFE_CORE_MESSAGE = (
-        "Use the available evidence to distinguish "
-        "demonstrated AI testing capabilities from "
-        "claims that still need verification."
+    CORE_MESSAGE_FALLBACKS = (
+        "Use the source-supported points below.",
+        "Focus on the retained source-supported points.",
+        "Keep the discussion limited to the retained points.",
     )
 
-    SAFE_SECTION_HEADING = (
-        "Practical Evaluation"
+    SECTION_HEADING_FALLBACKS = (
+        "Key Points",
+        "Review Points",
+        "Source-Supported Points",
     )
 
-    SAFE_SECTION_PURPOSE = (
-        "Keep the discussion useful without "
-        "exceeding the supplied evidence."
+    SECTION_PURPOSE_FALLBACKS = (
+        "Organize the retained points.",
+        "Present the retained points clearly.",
+        "Summarize the retained points.",
     )
 
-    SAFE_RECOMMENDATION = (
-        "When evaluating an AI testing capability, "
-        "compare its documented behavior with your "
-        "own QA requirements before relying on it."
+    RECOMMENDATION_FALLBACKS = (
+        "Review the retained points.",
+        "Use the retained points for evaluation.",
+        "Compare the retained points with your requirements.",
     )
 
-    SAFE_TAKEAWAY = (
-        "Treat unsupported benefits or limitations "
-        "as questions to verify, not established facts."
+    TAKEAWAY_FALLBACKS = (
+        "Review the retained source-supported points.",
+        "Keep conclusions limited to the retained points.",
+        "Use the retained points as the basis for evaluation.",
     )
 
-    SAFE_CALL_TO_ACTION = (
-        "Review the documented capability against "
-        "your own testing requirements."
+    CTA_FALLBACKS = (
+        "Review the points above.",
+        "Compare the points above with your requirements.",
+        "Use the points above for your evaluation.",
     )
 
     def remediate(
@@ -83,19 +90,19 @@ class MasterGroundingRemediator:
         title = self._replace_if_error(
             master_content.title,
             error_claims,
-            self.SAFE_TITLE,
+            self.TITLE_FALLBACKS,
         )
 
         hook = self._replace_if_error(
             master_content.hook,
             error_claims,
-            self.SAFE_HOOK,
+            self.HOOK_FALLBACKS,
         )
 
         core_message = self._replace_if_error(
             master_content.core_message,
             error_claims,
-            self.SAFE_CORE_MESSAGE,
+            self.CORE_MESSAGE_FALLBACKS,
         )
 
         sections = []
@@ -105,13 +112,13 @@ class MasterGroundingRemediator:
             heading = self._replace_if_error(
                 section.heading,
                 error_claims,
-                self.SAFE_SECTION_HEADING,
+                self.SECTION_HEADING_FALLBACKS,
             )
 
             purpose = self._replace_if_error(
                 section.purpose,
                 error_claims,
-                self.SAFE_SECTION_PURPOSE,
+                self.SECTION_PURPOSE_FALLBACKS,
             )
 
             key_points = [
@@ -136,16 +143,34 @@ class MasterGroundingRemediator:
             )
 
         if not sections:
+
+            section_heading = (
+                self._choose_replacement(
+                    error_claims,
+                    self.SECTION_HEADING_FALLBACKS,
+                )
+            )
+
+            section_purpose = (
+                self._choose_replacement(
+                    error_claims,
+                    self.SECTION_PURPOSE_FALLBACKS,
+                )
+            )
+
+            recommendation = (
+                self._choose_replacement(
+                    error_claims,
+                    self.RECOMMENDATION_FALLBACKS,
+                )
+            )
+
             sections = [
                 MasterSection(
-                    heading=(
-                        self.SAFE_SECTION_HEADING
-                    ),
-                    purpose=(
-                        self.SAFE_SECTION_PURPOSE
-                    ),
+                    heading=section_heading,
+                    purpose=section_purpose,
                     key_points=[
-                        self.SAFE_RECOMMENDATION
+                        recommendation
                     ],
                 )
             ]
@@ -162,14 +187,17 @@ class MasterGroundingRemediator:
 
         if not key_takeaways:
             key_takeaways = [
-                self.SAFE_TAKEAWAY
+                self._choose_replacement(
+                    error_claims,
+                    self.TAKEAWAY_FALLBACKS,
+                )
             ]
 
         call_to_action = (
             self._replace_if_error(
                 master_content.call_to_action,
                 error_claims,
-                self.SAFE_CALL_TO_ACTION,
+                self.CTA_FALLBACKS,
             )
         )
 
@@ -208,6 +236,9 @@ class MasterGroundingRemediator:
         ]
 
         report = GroundingReport(
+            review_version=(
+                grounding_report.review_version
+            ),
             passed=False,
             summary=(
                 "Deterministic remediation was "
@@ -228,16 +259,41 @@ class MasterGroundingRemediator:
         cls,
         value: str,
         error_claims: set[str],
-        replacement: str,
+        replacements: tuple[str, ...],
     ) -> str:
 
         if (
             cls._normalize(value)
-            in error_claims
+            not in error_claims
         ):
-            return replacement
+            return value
 
-        return value
+        return cls._choose_replacement(
+            error_claims,
+            replacements,
+        )
+
+    @classmethod
+    def _choose_replacement(
+        cls,
+        error_claims: set[str],
+        replacements: tuple[str, ...],
+    ) -> str:
+
+        for replacement in replacements:
+
+            if (
+                cls._normalize(
+                    replacement
+                )
+                not in error_claims
+            ):
+                return replacement
+
+        raise RuntimeError(
+            "Grounding remediation exhausted "
+            "all neutral fallback candidates."
+        )
 
     @classmethod
     def _assert_errors_removed(
