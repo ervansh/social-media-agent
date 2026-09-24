@@ -17,6 +17,7 @@ dependencies = [
     "ddgs>=9.16,<10",
     "sqlalchemy>=2.0,<3",
     "streamlit>=1.36,<2",
+    "pillow>=10.3",
 ]
 
 [project.optional-dependencies]
