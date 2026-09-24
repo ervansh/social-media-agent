@@ -959,11 +959,18 @@ class ContentPipelineService:
 
             feedback = "\n\n".join(feedback_parts)
 
+            previous_master_content = (
+                master_content
+            )
+
             master_content = master_agent.run(
                 research=research,
                 selected_idea=selected_idea,
                 strategy=strategy,
                 feedback=feedback,
+                previous_master_content=(
+                    previous_master_content
+                ),
             )
 
             self.persistence.save_model(
