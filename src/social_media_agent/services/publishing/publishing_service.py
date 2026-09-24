@@ -11,6 +11,9 @@ from social_media_agent.models.publication import (
 from social_media_agent.persistence.artifact_types import (
     ArtifactType,
 )
+from social_media_agent.persistence.run_status import (
+    RunStatus,
+)
 
 
 class PublishingService:
@@ -28,8 +31,48 @@ class PublishingService:
         run_id: str,
     ) -> PublicationBatch:
 
+        run = self.persistence.get_run(
+            run_id
+        )
+
+        if run is None:
+            raise ValueError(
+                f"Content run not found: {run_id}"
+            )
+
+        if (
+            run.status
+            == RunStatus.PUBLISHED.value
+        ):
+            previous = (
+                self._load_latest_batch(
+                    run_id
+                )
+            )
+
+            if previous is not None:
+                return previous
+
+        if (
+            run.status
+            != RunStatus
+            .APPROVED_FOR_PUBLISHING
+            .value
+        ):
+            raise ValueError(
+                "Publishing requires run status "
+                "approved_for_publishing. "
+                f"Current status: {run.status}"
+            )
+
         requests = self._build_requests(
             run_id
+        )
+
+        previously_published = (
+            self._load_published_results(
+                run_id
+            )
         )
 
         results: list[
@@ -37,6 +80,43 @@ class PublishingService:
         ] = []
 
         for request in requests:
+
+            previous_result = (
+                previously_published.get(
+                    request.platform
+                )
+            )
+
+            if previous_result is not None:
+
+                results.append(
+                    PublicationResult(
+                        platform=(
+                            previous_result
+                            .platform
+                        ),
+                        status="published",
+                        message=(
+                            "Already published; "
+                            "existing publication "
+                            "result reused."
+                        ),
+                        external_id=(
+                            previous_result
+                            .external_id
+                        ),
+                        response_payload={
+                            **(
+                                previous_result
+                                .response_payload
+                            ),
+                            "idempotent_reuse":
+                                True,
+                        },
+                    )
+                )
+
+                continue
 
             readiness_error = (
                 self._check_readiness(
@@ -106,6 +186,27 @@ class PublishingService:
             ArtifactType.PUBLICATION_RESULT,
             batch,
         )
+
+        if (
+            results
+            and all(
+                result.status
+                in {
+                    "published",
+                    "dry_run",
+                }
+                for result in results
+            )
+            and any(
+                result.status
+                == "published"
+                for result in results
+            )
+        ):
+            self.persistence.update_status(
+                run_id,
+                RunStatus.PUBLISHED.value,
+            )
 
         return batch
 
@@ -226,6 +327,44 @@ class PublishingService:
             )
 
         return media
+
+    def _load_latest_batch(
+        self,
+        run_id: str,
+    ) -> PublicationBatch | None:
+
+        payload = (
+            self.persistence
+            .get_latest_payload(
+                run_id,
+                ArtifactType.PUBLICATION_RESULT,
+            )
+        )
+
+        if payload is None:
+            return None
+
+        return PublicationBatch.model_validate(
+            payload
+        )
+
+    def _load_published_results(
+        self,
+        run_id: str,
+    ) -> dict[str, PublicationResult]:
+
+        batch = self._load_latest_batch(
+            run_id
+        )
+
+        if batch is None:
+            return {}
+
+        return {
+            result.platform: result
+            for result in batch.results
+            if result.status == "published"
+        }
 
     @staticmethod
     def _build_platform_payload(
