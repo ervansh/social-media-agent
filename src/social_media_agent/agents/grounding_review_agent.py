@@ -154,9 +154,23 @@ GROUNDING RULES
    - the number
    - what the number refers to.
 
-5. Recommendations and editorial guidance are not
-   factual claims unless presented as established
-   research findings.
+5. Recommendations, structural labels, review
+   instructions, and editorial/meta guidance are not
+   factual research claims unless they assert a domain
+   fact.
+
+   Examples that should NOT be flagged merely for
+   lacking source evidence:
+
+   - "AI Testing Review"
+   - "Review the points below."
+   - "Use the source-supported points below."
+   - "Key Points"
+   - "Review the points above."
+
+   These are presentation or evaluation instructions,
+   not claims about AI capability, performance,
+   adoption, reliability, outcomes, or evidence.
 
 6. Do not invent evidence, consequences, limitations,
    adoption levels, reliability claims, or outcomes.
