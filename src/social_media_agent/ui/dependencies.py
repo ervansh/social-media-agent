@@ -28,17 +28,23 @@ from social_media_agent.services.image.factory import (
 from social_media_agent.services.image_generation.creative_image_service import (
     CreativeImageGenerationService,
 )
-from social_media_agent.services.publishing.dry_run_publisher import (
-    DryRunPublisher,
-)
 from social_media_agent.services.publishing.publishing_service import (
     PublishingService,
 )
 from social_media_agent.services.publishing.factory import (
     get_publishers,
 )
-from social_media_agent.services.publishing.publishing_service import (
-    PublishingService,
+from social_media_agent.services.publishing.instagram_graph_client import (
+    InstagramGraphClient,
+)
+from social_media_agent.services.publishing.instagram_preflight import (
+    InstagramPublishingPreflight,
+)
+from social_media_agent.services.publishing.instagram_run_preflight import (
+    InstagramRunPreflightService,
+)
+from social_media_agent.services.publishing.media_url_factory import (
+    get_media_url_resolver,
 )
 
 
@@ -51,6 +57,20 @@ def get_publishing_service():
         ),
         publishers=get_publishers(),
     )
+
+@st.cache_resource
+def get_instagram_run_preflight_service():
+
+    return InstagramRunPreflightService(
+        persistence=get_persistence_service(),
+        preflight=InstagramPublishingPreflight(
+            client=InstagramGraphClient(),
+            media_url_resolver=(
+                get_media_url_resolver()
+            ),
+        ),
+    )
+
 
 @st.cache_resource
 def get_persistence_service() -> PersistenceService:
