@@ -160,38 +160,46 @@ ERROR if even one factual clause is unsupported.
 STRICT EXAMPLES
 ==================================================
 
-MASTER:
-M1: Some tools demonstrate self-healing capability.
+Example A
 
-PLATFORM:
-P1: AI tools provide self-healing capability.
+MASTER EXAMPLE:
+Some tools demonstrate self-healing capability.
+
+PLATFORM EXAMPLE:
+AI tools provide self-healing capability.
 
 => ERROR. "Some tools" became "AI tools".
 
-MASTER:
-M2: Human oversight remains essential.
+Example B
 
-PLATFORM:
-P2: AI may miss subtle defects or UI changes.
+MASTER EXAMPLE:
+Human oversight remains essential.
+
+PLATFORM EXAMPLE:
+AI may miss subtle defects or UI changes.
 
 => ERROR. "May miss subtle defects or UI changes" is
 a new factual consequence. Human oversight does not
 support that consequence.
 
-MASTER:
-M3: Some workflows generate tests faster.
+Example C
 
-PLATFORM:
-P3: Some workflows generate tests faster and improve
+MASTER EXAMPLE:
+Some workflows generate tests faster.
+
+PLATFORM EXAMPLE:
+Some workflows generate tests faster and improve
 release speed.
 
 => ERROR. Release speed is a new benefit.
 
-MASTER:
-M4: Review documented capability before relying on it.
+Example D
 
-PLATFORM:
-P4: Review the evidence before adopting the tool.
+MASTER EXAMPLE:
+Review documented capability before relying on it.
+
+PLATFORM EXAMPLE:
+Review the evidence before adopting the tool.
 
 => editorial or supported depending on wording.
 
