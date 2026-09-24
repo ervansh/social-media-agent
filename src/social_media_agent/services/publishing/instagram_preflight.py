@@ -55,23 +55,10 @@ class InstagramPublishingPreflight:
         accessible = False
 
         if storage_key:
-            media_url = (
-                self.media_url_resolver.resolve(
-                    storage_key
-                )
+            media_url = self.verify_media(
+                storage_key=storage_key
             )
-
-            accessible = (
-                self._is_publicly_accessible(
-                    media_url
-                )
-            )
-
-            if not accessible:
-                raise RuntimeError(
-                    "Resolved Instagram media URL "
-                    "is not publicly accessible."
-                )
+            accessible = True
 
         media_count = account.get(
             "media_count"
@@ -92,6 +79,29 @@ class InstagramPublishingPreflight:
             media_url=media_url,
             media_url_accessible=accessible,
         )
+
+    def verify_media(
+        self,
+        *,
+        storage_key: str,
+    ) -> str:
+
+        media_url = (
+            self.media_url_resolver.resolve(
+                storage_key
+            )
+        )
+
+        if not self._is_publicly_accessible(
+            media_url
+        ):
+            raise RuntimeError(
+                "Resolved Instagram media URL "
+                "is not publicly accessible. "
+                f"storage_key={storage_key}"
+            )
+
+        return media_url
 
     def _is_publicly_accessible(
         self,
