@@ -27,6 +27,7 @@ class SemanticGroundingReview(BaseModel):
 
 
 class GroundingReport(BaseModel):
+    review_version: int = 1
     passed: bool
     summary: str
 
