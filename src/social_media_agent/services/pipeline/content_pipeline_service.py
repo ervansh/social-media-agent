@@ -914,7 +914,13 @@ class ContentPipelineService:
         # has just been improved.
         # --------------------------------------------------
 
-        if grounding_report is None or not grounding_report.passed or master_changed:
+        if (
+            grounding_report is None
+            or not grounding_report.passed
+            or master_changed
+            or grounding_report.review_version
+            != GroundingReviewAgent.REVIEW_VERSION
+        ):
 
             grounding_report = grounding_agent.run(
                 research=research,
