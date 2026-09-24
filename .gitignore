@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Virtual environment
+.venv/
+venv/
+
+# Secrets
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+logs/*.log
+
+# Database
+data/database/*.db
+
+# Generated content
+data/output/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test cache
+.pytest_cache/
+.coverage
+htmlcov/

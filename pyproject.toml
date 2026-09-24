@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "social-media-agent"
+version = "0.1.0"
+description = "Agentic social media content generation platform"
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    "python-dotenv>=1.0",
+    "loguru>=0.7",
+    "requests>=2.31",
+    "langgraph>=1.0",
+    "ddgs>=9.16,<10",
+    "sqlalchemy>=2.0,<3",
+    "streamlit>=1.36,<2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=9.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
