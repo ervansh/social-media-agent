@@ -10,8 +10,8 @@ from social_media_agent.services.publishing.instagram_graph_client import (
 from social_media_agent.services.publishing.instagram_publisher import (
     InstagramPublisher,
 )
-from social_media_agent.services.publishing.media_url_resolver import (
-    PublicBaseUrlMediaUrlResolver,
+from social_media_agent.services.publishing.media_url_factory import (
+    get_media_url_resolver,
 )
 from social_media_agent.services.publishing.x_publisher import (
     XPublisher,
@@ -42,7 +42,7 @@ def get_publishers():
             "instagram": InstagramPublisher(
                 client=InstagramGraphClient(),
                 media_url_resolver=(
-                    PublicBaseUrlMediaUrlResolver()
+                    get_media_url_resolver()
                 ),
             ),
 
