@@ -628,6 +628,8 @@ class ContentPipelineService:
         # only when content changed
         # ----------------------------------------------
 
+        quality_content_changed = False
+
         if final_youtube is not None and (
             youtube is None or (final_youtube.model_dump() != youtube.model_dump())
         ):
@@ -638,6 +640,8 @@ class ContentPipelineService:
                 final_youtube,
                 platform="youtube",
             )
+
+            quality_content_changed = True
 
         if final_instagram is not None and (
             instagram is None
@@ -651,6 +655,8 @@ class ContentPipelineService:
                 platform="instagram",
             )
 
+            quality_content_changed = True
+
         if final_x is not None and (
             x_content is None or (final_x.model_dump() != x_content.model_dump())
         ):
@@ -661,6 +667,8 @@ class ContentPipelineService:
                 final_x,
                 platform="x",
             )
+
+            quality_content_changed = True
 
         # ----------------------------------------------
         # Persist quality report
@@ -688,6 +696,161 @@ class ContentPipelineService:
             )
 
             return status
+
+        if quality_content_changed:
+
+            post_quality_input = {
+                "strategy": strategy,
+                "master_content": master_content,
+                "retry_count": 0,
+            }
+
+            if final_youtube is not None:
+                post_quality_input[
+                    "youtube"
+                ] = final_youtube
+
+            if final_instagram is not None:
+                post_quality_input[
+                    "instagram"
+                ] = final_instagram
+
+            if final_x is not None:
+                post_quality_input[
+                    "x"
+                ] = final_x
+
+            post_quality_grounding = (
+                platform_grounding_workflow
+                .invoke(
+                    post_quality_input
+                )
+            )
+
+            post_quality_report = (
+                post_quality_grounding[
+                    "platform_grounding_report"
+                ]
+            )
+
+            grounded_youtube = (
+                post_quality_grounding.get(
+                    "youtube"
+                )
+            )
+
+            grounded_instagram = (
+                post_quality_grounding.get(
+                    "instagram"
+                )
+            )
+
+            grounded_x = (
+                post_quality_grounding.get(
+                    "x"
+                )
+            )
+
+            post_grounding_changed = False
+
+            for platform_name, previous, grounded in (
+                (
+                    "youtube",
+                    final_youtube,
+                    grounded_youtube,
+                ),
+                (
+                    "instagram",
+                    final_instagram,
+                    grounded_instagram,
+                ),
+                (
+                    "x",
+                    final_x,
+                    grounded_x,
+                ),
+            ):
+
+                if (
+                    grounded is not None
+                    and (
+                        previous is None
+                        or grounded.model_dump()
+                        != previous.model_dump()
+                    )
+                ):
+                    self.persistence.save_model(
+                        run_id,
+                        ArtifactType.PLATFORM_CONTENT,
+                        grounded,
+                        platform=platform_name,
+                    )
+
+                    post_grounding_changed = True
+
+            self.persistence.save_model(
+                run_id,
+                ArtifactType.PLATFORM_GROUNDING_REPORT,
+                post_quality_report,
+            )
+
+            if not post_quality_report.passed:
+
+                status = (
+                    RunStatus
+                    .FAILED_PLATFORM_GROUNDING
+                    .value
+                )
+
+                self.persistence.update_status(
+                    run_id,
+                    status,
+                )
+
+                return status
+
+            final_youtube = grounded_youtube
+            final_instagram = (
+                grounded_instagram
+            )
+            final_x = grounded_x
+
+            if post_grounding_changed:
+
+                quality_report = (
+                    quality_agent.run(
+                        strategy=strategy,
+                        master_content=(
+                            master_content
+                        ),
+                        youtube=final_youtube,
+                        instagram=(
+                            final_instagram
+                        ),
+                        x=final_x,
+                    )
+                )
+
+                self.persistence.save_model(
+                    run_id,
+                    ArtifactType.QUALITY_REPORT,
+                    quality_report,
+                )
+
+                if not quality_report.passed:
+
+                    status = (
+                        RunStatus
+                        .FAILED_QUALITY_GATE
+                        .value
+                    )
+
+                    self.persistence.update_status(
+                        run_id,
+                        status,
+                    )
+
+                    return status
 
         # ==================================================
         # PHASE 8
@@ -1306,6 +1469,7 @@ class ContentPipelineService:
             quality_report = QualityReport.model_validate(quality_payload)
 
         quality_ran = False
+        quality_content_changed = False
 
         if (
             quality_report is None
@@ -1368,6 +1532,8 @@ class ContentPipelineService:
                     platform="youtube",
                 )
 
+                quality_content_changed = True
+
             if final_instagram is not None and (
                 instagram is None
                 or final_instagram.model_dump() != instagram.model_dump()
@@ -1380,6 +1546,8 @@ class ContentPipelineService:
                     platform="instagram",
                 )
 
+                quality_content_changed = True
+
             if final_x is not None and (
                 x_content is None or final_x.model_dump() != x_content.model_dump()
             ):
@@ -1390,6 +1558,8 @@ class ContentPipelineService:
                     final_x,
                     platform="x",
                 )
+
+                quality_content_changed = True
 
             youtube = final_youtube
             instagram = final_instagram
@@ -1417,6 +1587,155 @@ class ContentPipelineService:
             )
 
             return status
+
+        if quality_content_changed:
+
+            post_quality_input = {
+                "strategy": strategy,
+                "master_content": master_content,
+                "retry_count": 0,
+            }
+
+            if youtube is not None:
+                post_quality_input[
+                    "youtube"
+                ] = youtube
+
+            if instagram is not None:
+                post_quality_input[
+                    "instagram"
+                ] = instagram
+
+            if x_content is not None:
+                post_quality_input[
+                    "x"
+                ] = x_content
+
+            post_quality_grounding = (
+                platform_grounding_workflow
+                .invoke(
+                    post_quality_input
+                )
+            )
+
+            post_quality_report = (
+                post_quality_grounding[
+                    "platform_grounding_report"
+                ]
+            )
+
+            grounded_youtube = (
+                post_quality_grounding.get(
+                    "youtube"
+                )
+            )
+            grounded_instagram = (
+                post_quality_grounding.get(
+                    "instagram"
+                )
+            )
+            grounded_x = (
+                post_quality_grounding.get(
+                    "x"
+                )
+            )
+
+            post_grounding_changed = False
+
+            for platform_name, previous, grounded in (
+                (
+                    "youtube",
+                    youtube,
+                    grounded_youtube,
+                ),
+                (
+                    "instagram",
+                    instagram,
+                    grounded_instagram,
+                ),
+                (
+                    "x",
+                    x_content,
+                    grounded_x,
+                ),
+            ):
+
+                if (
+                    grounded is not None
+                    and (
+                        previous is None
+                        or grounded.model_dump()
+                        != previous.model_dump()
+                    )
+                ):
+                    self.persistence.save_model(
+                        run_id,
+                        ArtifactType.PLATFORM_CONTENT,
+                        grounded,
+                        platform=platform_name,
+                    )
+
+                    post_grounding_changed = True
+
+            self.persistence.save_model(
+                run_id,
+                ArtifactType.PLATFORM_GROUNDING_REPORT,
+                post_quality_report,
+            )
+
+            if not post_quality_report.passed:
+
+                status = (
+                    RunStatus
+                    .FAILED_PLATFORM_GROUNDING
+                    .value
+                )
+
+                self.persistence.update_status(
+                    run_id,
+                    status,
+                )
+
+                return status
+
+            youtube = grounded_youtube
+            instagram = grounded_instagram
+            x_content = grounded_x
+
+            if post_grounding_changed:
+
+                quality_report = (
+                    quality_agent.run(
+                        strategy=strategy,
+                        master_content=(
+                            master_content
+                        ),
+                        youtube=youtube,
+                        instagram=instagram,
+                        x=x_content,
+                    )
+                )
+
+                self.persistence.save_model(
+                    run_id,
+                    ArtifactType.QUALITY_REPORT,
+                    quality_report,
+                )
+
+                if not quality_report.passed:
+
+                    status = (
+                        RunStatus
+                        .FAILED_QUALITY_GATE
+                        .value
+                    )
+
+                    self.persistence.update_status(
+                        run_id,
+                        status,
+                    )
+
+                    return status
 
         # ==================================================
         # STEP 6
