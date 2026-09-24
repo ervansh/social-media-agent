@@ -1,6 +1,9 @@
 import streamlit as st
 
 from social_media_agent.config.settings import settings
+from social_media_agent.persistence.artifact_types import (
+    ArtifactType,
+)
 from social_media_agent.persistence.run_status import RunStatus
 from social_media_agent.ui.dependencies import (
     get_instagram_run_preflight_service,
@@ -151,7 +154,7 @@ Current publishing support:
     instagram_payload = (
         persistence.get_latest_payload(
             selected_run_id,
-            "platform_content",
+            ArtifactType.PLATFORM_CONTENT,
             platform="instagram",
         )
     )
