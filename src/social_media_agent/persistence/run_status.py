@@ -14,6 +14,7 @@ class RunStatus(StrEnum):
     READY_FOR_HUMAN_REVIEW = "ready_for_human_review"
 
     APPROVED_FOR_PUBLISHING = "approved_for_publishing"
+    PUBLISHED = "published"
     REJECTED = "rejected"
 
     FAILED_GROUNDING = "failed_grounding"
