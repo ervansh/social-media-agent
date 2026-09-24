@@ -137,9 +137,9 @@ def render():
         """
 Current publishing support:
 
-- **X** — text publishing architecture available
-- **Instagram** — requires generated media
-- **YouTube** — requires a final video file
+- **X** — live text publishing available
+- **Instagram** — live image/carousel publishing available; requires public generated JPEG media
+- **YouTube** — live publishing not implemented yet; requires a final video file
 """
     )
 
