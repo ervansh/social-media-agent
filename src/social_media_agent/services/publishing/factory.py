@@ -4,6 +4,15 @@ from social_media_agent.config.settings import (
 from social_media_agent.services.publishing.dry_run_publisher import (
     DryRunPublisher,
 )
+from social_media_agent.services.publishing.instagram_graph_client import (
+    InstagramGraphClient,
+)
+from social_media_agent.services.publishing.instagram_publisher import (
+    InstagramPublisher,
+)
+from social_media_agent.services.publishing.media_url_resolver import (
+    PublicBaseUrlMediaUrlResolver,
+)
 from social_media_agent.services.publishing.x_publisher import (
     XPublisher,
 )
@@ -11,7 +20,9 @@ from social_media_agent.services.publishing.x_publisher import (
 
 def get_publishers():
 
-    if settings.publishing_mode == "dry_run":
+    mode = settings.publishing_mode.lower()
+
+    if mode == "dry_run":
 
         dry_run = DryRunPublisher()
 
@@ -21,15 +32,20 @@ def get_publishers():
             "x": dry_run,
         }
 
-    if settings.publishing_mode == "live":
+    if mode == "live":
 
         return {
-            # These remain simulated until their
-            # real integrations are implemented.
+            # YouTube remains simulated until
+            # its live integration is implemented.
             "youtube": DryRunPublisher(),
-            "instagram": DryRunPublisher(),
 
-            # X can publish live.
+            "instagram": InstagramPublisher(
+                client=InstagramGraphClient(),
+                media_url_resolver=(
+                    PublicBaseUrlMediaUrlResolver()
+                ),
+            ),
+
             "x": XPublisher(),
         }
 
