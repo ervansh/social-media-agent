@@ -94,7 +94,7 @@ class ExactClaimLLM:
     ):
 
         assert (
-            "C2: Self-healing is not "
+            "C3: Self-healing is not "
             "widely adopted."
             in prompt
         )
@@ -106,7 +106,7 @@ class ExactClaimLLM:
             ),
             issues=[
                 {
-                    "claim_id": 2,
+                    "claim_id": 3,
                     "severity": "error",
                     "reason": (
                         "The evidence does "
@@ -167,14 +167,14 @@ class DuplicateClaimLLM:
             summary="Duplicate references.",
             issues=[
                 {
-                    "claim_id": 2,
+                    "claim_id": 3,
                     "severity": "warning",
                     "reason":
                         "First review.",
                     "supporting_source_urls": [],
                 },
                 {
-                    "claim_id": 2,
+                    "claim_id": 3,
                     "severity": "error",
                     "reason":
                         "Duplicate review.",
