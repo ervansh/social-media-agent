@@ -270,7 +270,7 @@ def build_content_creation_workflow(
 
     graph.add_edge(
         "revise_master_content",
-        "grounding_passed",
+        "grounding_review",
     )
 
     graph.add_edge(
