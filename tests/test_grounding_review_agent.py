@@ -196,6 +196,10 @@ def test_grounding_report_uses_exact_master_claim():
     )
 
     assert result.passed is False
+    assert (
+        result.review_version
+        == GroundingReviewAgent.REVIEW_VERSION
+    )
     assert len(result.issues) == 1
 
     issue = result.issues[0]
