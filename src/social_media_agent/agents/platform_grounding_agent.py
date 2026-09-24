@@ -1,18 +1,49 @@
-import json
+from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from social_media_agent.config.settings import settings
+from social_media_agent.models.grounding import (
+    GroundingIssue,
+)
 from social_media_agent.models.master_content import (
     MasterContent,
 )
 from social_media_agent.models.platform_grounding import (
     PlatformGroundingReport,
-    SemanticPlatformGroundingReview,
+)
+from social_media_agent.services.grounding.claim_extractor import (
+    extract_master_claims,
+    extract_platform_claims,
 )
 
 
+class _PlatformClaimDisposition(BaseModel):
+    claim_id: int
+
+    verdict: Literal[
+        "supported",
+        "editorial",
+        "warning",
+        "error",
+    ]
+
+    master_claim_ids: list[int] = Field(
+        default_factory=list
+    )
+
+
+class _PlatformClaimDispositionBatch(BaseModel):
+    reviews: list[
+        _PlatformClaimDisposition
+    ] = Field(
+        min_length=1
+    )
+
+
 class PlatformGroundingAgent:
+
+    REVIEW_VERSION = 2
 
     def __init__(
         self,
@@ -28,180 +59,144 @@ class PlatformGroundingAgent:
         platform_content: BaseModel,
     ) -> PlatformGroundingReport:
 
-        master_payload = (
-            master_content.model_dump(
-                mode="json",
-                exclude={
-                    "sources",
-                },
+        master_claims = (
+            extract_master_claims(
+                master_content
             )
         )
 
-        platform_payload = (
-            platform_content.model_dump(
-                mode="json"
+        platform_claims = (
+            extract_platform_claims(
+                platform_content
             )
         )
 
-        master_json = json.dumps(
-            master_payload,
-            ensure_ascii=False,
-            separators=(",", ":"),
+        master_lines = "\n".join(
+            f"M{claim_id}: {claim}"
+            for claim_id, claim
+            in master_claims.items()
         )
 
-        platform_json = json.dumps(
-            platform_payload,
-            ensure_ascii=False,
-            separators=(",", ":"),
+        platform_lines = "\n".join(
+            f"P{claim_id}: {claim}"
+            for claim_id, claim
+            in platform_claims.items()
         )
 
         prompt = f"""
-You are a platform-content drift reviewer.
+You are a strict platform-content factual drift
+reviewer.
 
-MASTER CONTENT has already passed the primary
-research-grounding gate.
+MASTER CONTENT has already passed research grounding.
 
-Do NOT re-review the factual correctness of
-MASTER CONTENT.
-
-Your ONLY task is to determine whether PLATFORM
-CONTENT changes factual meaning beyond MASTER
-CONTENT.
-
-PLATFORM:
-
-{platform}
-
-MASTER CONTENT:
-
-{master_json}
-
-PLATFORM CONTENT:
-
-{platform_json}
-
-==================================================
-CORE PRINCIPLE
-==================================================
-
-MASTER CONTENT is authoritative.
-
-If PLATFORM CONTENT contains a statement that is
-semantically equivalent to MASTER CONTENT, it is
-allowed.
-
-Do NOT flag that statement because you personally
-believe it needs stronger research evidence.
-
-That question belongs to the previous grounding
-stage.
-
-==================================================
-ERROR
-==================================================
-
-Return ERROR when PLATFORM CONTENT:
-
-- introduces a factual assertion absent from MASTER,
-- introduces a new population,
-- introduces a new benefit,
-- introduces a new capability,
-- introduces a new statistic,
-- introduces a new named tool or company,
-- introduces a new study or source,
-- materially broadens a claim,
-- converts a limited claim into a general claim,
-- converts uncertainty into certainty,
-- invents attribution,
-- changes attribution,
-- connects a person/session/source to a capability
-  not connected to it in MASTER CONTENT.
-
-Examples:
-
-MASTER:
-"Certain tools demonstrate capability X."
-
-PLATFORM:
-"AI tools provide capability X."
-
-=> factual broadening.
-
-MASTER:
-"Session A demonstrated test generation."
-
-PLATFORM:
-"Session A demonstrated self-healing."
-
-=> attribution error.
-
-==================================================
-WARNING
-==================================================
-
-Return WARNING when meaning remains substantially
-the same but:
-
-- wording becomes slightly broader,
-- qualification becomes weaker,
-- an important caveat is omitted,
-- truncation removes important conditional wording.
-
-Warnings alone do NOT fail the gate.
-
-==================================================
-DO NOT FLAG
-==================================================
-
-Do not flag:
-
-- style changes,
-- sentence restructuring,
-- shorter wording,
-- formatting,
-- hooks,
-- editorial questions,
-- calls to action,
-- semantically equivalent paraphrases,
-- claims copied faithfully from MASTER CONTENT.
-
-==================================================
-STRICT REVIEW RULES
-==================================================
+Your ONLY task is to compare every numbered PLATFORM
+STATEMENT against the numbered MASTER CLAIMS.
 
 Do not use external knowledge.
-
 Do not use research evidence.
-
 Do not re-ground MASTER CONTENT.
 
-Do not claim MASTER CONTENT contains something
-unless that meaning actually appears in the
-supplied MASTER CONTENT.
+PLATFORM:
+{platform}
 
-Do not infer missing facts.
+MASTER CLAIMS:
 
-Compare only:
+{master_lines}
 
-MASTER CONTENT
-versus
-PLATFORM CONTENT.
+PLATFORM STATEMENTS:
+
+{platform_lines}
 
 ==================================================
-OUTPUT
+MANDATORY COVERAGE CONTRACT
 ==================================================
 
-Return only actionable WARNING or ERROR issues.
+Return exactly ONE review for EVERY P# statement.
 
-Do not emit supported findings.
+- Do not skip any P#.
+- Do not return any P# twice.
+- claim_id is the numeric part of P#.
+- master_claim_ids may contain only numeric M# IDs.
 
-Maximum 6 issues.
+Python will reject the response if any P# is missing,
+duplicated, or invalid.
 
-Summary maximum 2 short sentences.
+==================================================
+VERDICTS
+==================================================
 
-Reasons must be concise.
+supported:
+The entire factual meaning of the P# statement is
+already present in one or more mapped M# claims.
 
-No explanation outside structured JSON.
+For supported:
+- master_claim_ids MUST contain at least one M#.
+
+editorial:
+The statement is purely presentation, a question,
+CTA, label, formatting, or non-factual guidance.
+
+For editorial:
+- master_claim_ids may be empty.
+
+warning:
+The statement is mostly supported but weakens an
+important qualification or becomes slightly broader.
+
+For warning:
+- map the relevant M# claims.
+
+error:
+The statement introduces any factual meaning absent
+from MASTER CONTENT, materially broadens scope,
+strengthens certainty, changes attribution, combines
+a supported fact with an unsupported consequence, or
+adds a new benefit/limitation/capability/outcome.
+
+A statement containing multiple factual clauses is
+ERROR if even one factual clause is unsupported.
+
+==================================================
+STRICT EXAMPLES
+==================================================
+
+MASTER:
+M1: Some tools demonstrate self-healing capability.
+
+PLATFORM:
+P1: AI tools provide self-healing capability.
+
+=> ERROR. "Some tools" became "AI tools".
+
+MASTER:
+M2: Human oversight remains essential.
+
+PLATFORM:
+P2: AI may miss subtle defects or UI changes.
+
+=> ERROR. "May miss subtle defects or UI changes" is
+a new factual consequence. Human oversight does not
+support that consequence.
+
+MASTER:
+M3: Some workflows generate tests faster.
+
+PLATFORM:
+P3: Some workflows generate tests faster and improve
+release speed.
+
+=> ERROR. Release speed is a new benefit.
+
+MASTER:
+M4: Review documented capability before relying on it.
+
+PLATFORM:
+P4: Review the evidence before adopting the tool.
+
+=> editorial or supported depending on wording.
+
+Do not assume a new statement is supported merely
+because it sounds plausible or aligns with the theme.
 
 Return structured JSON only.
 """
@@ -209,7 +204,7 @@ Return structured JSON only.
         semantic = (
             self.llm.generate_structured(
                 prompt,
-                SemanticPlatformGroundingReview,
+                _PlatformClaimDispositionBatch,
                 timeout_seconds=(
                     settings
                     .platform_grounding_timeout_seconds
@@ -221,15 +216,153 @@ Return structured JSON only.
             )
         )
 
-        passed = not any(
+        reviews_by_id = {}
+
+        for review in semantic.reviews:
+
+            if (
+                review.claim_id
+                in reviews_by_id
+            ):
+                raise RuntimeError(
+                    "Platform grounding reviewer "
+                    "returned duplicate claim_id: "
+                    f"{review.claim_id}"
+                )
+
+            reviews_by_id[
+                review.claim_id
+            ] = review
+
+        expected_ids = set(
+            platform_claims
+        )
+
+        actual_ids = set(
+            reviews_by_id
+        )
+
+        if actual_ids != expected_ids:
+
+            missing = sorted(
+                expected_ids
+                - actual_ids
+            )
+
+            unexpected = sorted(
+                actual_ids
+                - expected_ids
+            )
+
+            raise RuntimeError(
+                "Platform grounding reviewer "
+                "coverage mismatch. "
+                f"Missing={missing}, "
+                f"Unexpected={unexpected}"
+            )
+
+        valid_master_ids = set(
+            master_claims
+        )
+
+        issues: list[
+            GroundingIssue
+        ] = []
+
+        for claim_id in sorted(
+            reviews_by_id
+        ):
+
+            review = reviews_by_id[
+                claim_id
+            ]
+
+            invalid_master_ids = [
+                master_id
+                for master_id
+                in review.master_claim_ids
+                if master_id
+                not in valid_master_ids
+            ]
+
+            if invalid_master_ids:
+                raise RuntimeError(
+                    "Platform grounding reviewer "
+                    "returned invalid master claim "
+                    "IDs: "
+                    f"{invalid_master_ids}"
+                )
+
+            if (
+                review.verdict
+                in {
+                    "supported",
+                    "warning",
+                }
+                and not review.master_claim_ids
+            ):
+                raise RuntimeError(
+                    "Platform grounding reviewer "
+                    f"returned {review.verdict} "
+                    "without a mapped Master claim "
+                    f"for P{claim_id}."
+                )
+
+            if review.verdict not in {
+                "warning",
+                "error",
+            }:
+                continue
+
+            if review.verdict == "warning":
+                reason = (
+                    "Platform wording weakens or "
+                    "broadens qualification relative "
+                    "to mapped Master Content."
+                )
+            else:
+                reason = (
+                    "Platform statement introduces "
+                    "or materially changes factual "
+                    "meaning beyond Master Content."
+                )
+
+            issues.append(
+                GroundingIssue(
+                    severity=review.verdict,
+                    claim=platform_claims[
+                        claim_id
+                    ],
+                    reason=reason,
+                    supporting_source_urls=[],
+                )
+            )
+
+        error_count = sum(
             issue.severity == "error"
-            for issue
-            in semantic.issues
+            for issue in issues
+        )
+
+        warning_count = sum(
+            issue.severity == "warning"
+            for issue in issues
+        )
+
+        passed = (
+            error_count == 0
+        )
+
+        summary = (
+            f"Reviewed {len(platform_claims)} "
+            "platform statement(s) against "
+            f"{len(master_claims)} Master claim(s): "
+            f"{error_count} error(s), "
+            f"{warning_count} warning(s)."
         )
 
         return PlatformGroundingReport(
             platform=platform,
             passed=passed,
-            summary=semantic.summary,
-            issues=semantic.issues,
+            summary=summary,
+            issues=issues,
         )
