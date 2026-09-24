@@ -83,7 +83,14 @@ class Settings(BaseSettings):
 
     publishing_mode: str = "dry_run"
 
+    media_url_provider: str = "public_base_url"
     public_media_base_url: str | None = None
+
+    media_s3_bucket: str | None = None
+    media_s3_region: str | None = None
+    media_s3_prefix: str = "social-media-agent"
+    media_s3_endpoint_url: str | None = None
+    media_s3_presigned_url_expiry_seconds: int = 3600
 
     x_api_base_url: str = "https://api.x.com/2"
     x_user_access_token: str | None = None
