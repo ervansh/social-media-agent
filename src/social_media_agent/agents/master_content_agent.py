@@ -23,29 +23,96 @@ class MasterContentAgent:
         selected_idea: ContentIdea,
         strategy: ContentStrategy,
         feedback: str | None = None,
+        previous_master_content: (
+            MasterContent | None
+        ) = None,
     ) -> MasterContent:
 
-        # ==================================================
-        # Research summary
-        # ==================================================
+        findings = "\n".join(
+            f"- {finding}"
+            for finding
+            in research.key_findings
+        )
 
-        findings = "\n".join(f"- {finding}" for finding in research.key_findings)
+        source_evidence = (
+            self._build_source_evidence(
+                research
+            )
+        )
 
-        # ==================================================
-        # Compact source evidence
-        #
-        # IMPORTANT:
-        # Use the SAME evidence limits used by the
-        # grounding reviewer.
-        # ==================================================
+        if feedback is not None:
 
-        selected_sources = research.sources[: settings.grounding_max_sources]
+            if previous_master_content is None:
+                raise ValueError(
+                    "previous_master_content is "
+                    "required for grounding revision."
+                )
+
+            prompt = (
+                self._build_revision_prompt(
+                    research=research,
+                    selected_idea=selected_idea,
+                    strategy=strategy,
+                    findings=findings,
+                    source_evidence=(
+                        source_evidence
+                    ),
+                    feedback=feedback,
+                    previous_master_content=(
+                        previous_master_content
+                    ),
+                )
+            )
+
+        else:
+
+            prompt = (
+                self._build_initial_prompt(
+                    research=research,
+                    selected_idea=selected_idea,
+                    strategy=strategy,
+                    findings=findings,
+                    source_evidence=(
+                        source_evidence
+                    ),
+                )
+            )
+
+        draft = self.llm.generate_structured(
+            prompt,
+            MasterContentDraft,
+            timeout_seconds=(
+                settings
+                .master_content_timeout_seconds
+            ),
+            max_output_tokens=(
+                settings
+                .master_content_max_output_tokens
+            ),
+        )
+
+        return MasterContent(
+            **draft.model_dump(),
+            sources=research.sources,
+        )
+
+    @staticmethod
+    def _build_source_evidence(
+        research: ResearchBrief,
+    ) -> str:
+
+        selected_sources = research.sources[
+            : settings.grounding_max_sources
+        ]
 
         evidence_blocks = []
 
         for source in selected_sources:
 
-            snippet = source.snippet[: settings.grounding_source_max_chars]
+            snippet = source.snippet[
+                : settings
+                .grounding_source_max_chars
+            ]
 
             evidence_blocks.append(
                 (
@@ -55,85 +122,41 @@ class MasterContentAgent:
                 )
             )
 
-        source_evidence = "\n\n".join(evidence_blocks)
+        source_evidence = "\n\n".join(
+            evidence_blocks
+        )
 
         if not source_evidence:
-            source_evidence = "No explicit source evidence available."
+            return (
+                "No explicit source evidence "
+                "available."
+            )
 
-        # ==================================================
-        # Strategy data
-        # ==================================================
+        return source_evidence
 
-        must_include = "\n".join(f"- {point}" for point in strategy.must_include_points)
+    @staticmethod
+    def _build_initial_prompt(
+        *,
+        research: ResearchBrief,
+        selected_idea: ContentIdea,
+        strategy: ContentStrategy,
+        findings: str,
+        source_evidence: str,
+    ) -> str:
 
-        avoid_claims = "\n".join(f"- {claim}" for claim in strategy.avoid_claims)
+        must_include = "\n".join(
+            f"- {point}"
+            for point
+            in strategy.must_include_points
+        )
 
-        # ==================================================
-        # Revision feedback
-        # ==================================================
+        avoid_claims = "\n".join(
+            f"- {claim}"
+            for claim
+            in strategy.avoid_claims
+        )
 
-        feedback_section = ""
-
-        if feedback:
-
-            feedback_section = f"""
-        GROUNDING REVISION FEEDBACK:
-
-        {feedback}
-
-        GROUNDING OVERRIDES THE ORIGINAL STRATEGY.
-
-        If the strategy, approved idea, hook, core message,
-        or previous content contains a claim that conflicts
-        with this grounding feedback, DO NOT preserve that
-        claim merely because it appeared upstream.
-
-        For each ERROR:
-
-        - Remove the claim completely, OR
-        - rewrite it into a narrower statement that is
-        directly supported by SOURCE EVIDENCE.
-
-        For each WARNING:
-
-        - soften the wording,
-        - narrow the scope,
-        - qualify the statement,
-        - or remove it if the evidence remains too weak.
-
-        Examples:
-
-        ERROR:
-        "AI tools eliminate manual scripting."
-
-        Possible revision:
-        "Some AI-assisted workflows can generate test cases
-        from high-level documentation."
-
-        ERROR:
-        "Non-technical users can automate tests."
-
-        If the evidence only says "wider participation",
-        do not infer "non-technical users".
-
-        WARNING:
-        "AI tools generate tests from user stories."
-
-        Possible revision:
-        "Some AI-assisted workflows demonstrate test-case
-        generation from high-level documentation."
-
-        Do not reintroduce a removed unsupported claim
-        elsewhere in the content.
-
-        Do not introduce new factual claims during revision.
-        """
-
-        # ==================================================
-        # Prompt
-        # ==================================================
-
-        prompt = f"""
+        return f"""
 You are the master-content creator for a
 multi-platform social media content system.
 
@@ -160,6 +183,10 @@ Hook:
 
 Angle:
 {selected_idea.angle}
+
+IMPORTANT:
+The approved idea is creative direction.
+It is NOT factual evidence.
 
 RESEARCH SUMMARY:
 
@@ -202,112 +229,172 @@ CALL TO ACTION:
 
 {strategy.call_to_action}
 
-{feedback_section}
-
 FACTUAL GROUNDING RULES:
 
-1. Every factual assertion must be directly supported
+1. SOURCE EVIDENCE is the factual ceiling.
+
+2. Strategy, approved idea, hook, angle, research
+   summary, and key findings are NOT evidence.
+
+3. Every factual assertion must be directly supported
    by SOURCE EVIDENCE.
 
-2. Do not convert vague evidence into a specific claim.
+4. Do not convert vague evidence into a specific claim.
 
-3. Never use a statistic unless the evidence explicitly
-   states BOTH:
-   - the number
-   - exactly what the number refers to.
+5. Never use a statistic unless the evidence explicitly
+   states BOTH the number and what it refers to.
 
-4. Do not infer missing words from incomplete source text.
+6. Do not infer missing words from incomplete evidence.
 
-Example:
-
-Evidence:
-"GenAI tools will write 70% of..."
-
-INVALID:
-"70% of test cases will be AI-generated."
-
-The evidence does not explicitly say "test cases".
-
-5. Do not invent:
+7. Do not invent:
    - statistics
    - studies
    - companies
    - surveys
    - examples
    - product capabilities
-   - industry adoption claims.
+   - limitations
+   - adoption levels
+   - reliability claims
+   - performance outcomes
+   - consequences.
 
-6. Editorial frameworks and recommendations are allowed,
-   but present them as recommendations rather than
-   established facts.
+8. A demonstrated capability proves only that capability
+   in the demonstrated context.
 
-Prefer:
-"A practical way to evaluate a tool is..."
+9. Do not invent the opposite of a source claim.
 
-Instead of:
-"Research proves this is the best framework."
+Example:
+Evidence:
+"Tool X has self-healing locators."
 
-7. If evidence is weak, use cautious wording or omit
-   the statement.
+Unsupported:
+"Self-healing is not widely adopted."
+"Self-healing is unreliable."
+"Self-healing may miss defects."
 
-8. Human guidance, recommendations, structure, and
-   educational framing do not need to be presented
-   as scientific facts.
+10. Editorial recommendations are allowed, but phrase
+    them as recommendations rather than established facts.
 
-9. A demonstration or example proves only that the
-   demonstrated capability exists in that context.
-   It does not prove that all AI tools have that
-   capability.
+11. Avoid universal wording unless SOURCE EVIDENCE
+    explicitly supports that scope.
 
-10. Avoid universal wording such as:
-    - "AI tools can..."
-    - "AI tools do..."
-    - "AI eliminates..."
-    - "AI enables..."
-   unless the evidence supports that scope.
-
-Prefer:
-    - "Some AI-assisted workflows can..."
-    - "Certain tools demonstrate..."
-    - "One practical use demonstrated in the
-       evidence is..."
-
-11. If Strategy and SOURCE EVIDENCE conflict,
+12. If Strategy and SOURCE EVIDENCE conflict,
     SOURCE EVIDENCE always wins.
 
 CONTENT REQUIREMENTS:
 
-- Follow the approved idea.
-- Follow the content strategy.
-- Keep the narrative practical.
-- Keep sections concise.
-- Preserve the core message.
+- Preserve the useful intent of the approved idea.
+- Follow strategy only where it does not exceed evidence.
+- Keep the narrative practical and concise.
 - Include actionable takeaways.
-- Do not include citations.
-- Do not output URLs.
+- Do not include citations or URLs.
 - Do not create platform-specific content.
-- Do not generate hashtags.
-- Do not generate timestamps.
+- Do not generate hashtags or timestamps.
 
 Return structured JSON only.
 """
 
-        # ==================================================
-        # Generate
-        # ==================================================
+    @staticmethod
+    def _build_revision_prompt(
+        *,
+        research: ResearchBrief,
+        selected_idea: ContentIdea,
+        strategy: ContentStrategy,
+        findings: str,
+        source_evidence: str,
+        feedback: str,
+        previous_master_content: MasterContent,
+    ) -> str:
 
-        draft = self.llm.generate_structured(
-            prompt,
-            MasterContentDraft,
-            timeout_seconds=(settings.master_content_timeout_seconds),
-            max_output_tokens=(settings.master_content_max_output_tokens),
+        previous_payload = (
+            previous_master_content
+            .model_dump_json(
+                indent=2,
+                exclude={
+                    "sources",
+                },
+            )
         )
 
-        # ==================================================
-        # Attach sources programmatically
-        # ==================================================
+        return f"""
+You are revising previously generated Master Content
+after a strict factual-grounding review.
 
-        return MasterContent(
-            **draft.model_dump(),
-            sources=research.sources,
-        )
+This is an EDIT operation, not a fresh regeneration.
+
+TOPIC:
+{research.topic}
+
+TARGET AUDIENCE:
+{research.audience}
+
+APPROVED IDEA TITLE:
+{selected_idea.title}
+
+STYLE ONLY:
+Tone: {strategy.tone}
+Content depth: {strategy.content_depth}
+
+IMPORTANT:
+Do NOT use the approved idea, original strategy,
+research summary, or key findings as factual evidence.
+
+KEY FINDINGS FOR CONTEXT ONLY:
+{findings}
+
+SOURCE EVIDENCE — THE ONLY FACTUAL CEILING:
+
+{source_evidence}
+
+PREVIOUS MASTER CONTENT:
+
+{previous_payload}
+
+GROUNDING REVISION FEEDBACK:
+
+{feedback}
+
+REVISION CONTRACT:
+
+1. Revise the PREVIOUS MASTER CONTENT rather than
+   regenerating from the original strategy.
+
+2. Every factual assertion in the revised content must
+   be directly supported by SOURCE EVIDENCE.
+
+3. For every ERROR:
+   - remove the exact claim, OR
+   - replace it with a narrower claim directly supported
+     by SOURCE EVIDENCE.
+
+4. For every WARNING:
+   - narrow, qualify, or remove the exact claim.
+
+5. Do not reintroduce a removed claim under different
+   wording elsewhere.
+
+6. Do not add new factual claims during revision.
+
+7. Do not invent limitations, consequences, adoption
+   levels, reliability claims, performance outcomes,
+   missed defects, false confidence, or human-review
+   requirements unless SOURCE EVIDENCE states them.
+
+8. If the original strategy or approved idea conflicts
+   with SOURCE EVIDENCE, ignore the conflicting factual
+   framing.
+
+9. Preserve the topic, useful editorial structure,
+   tone, and platform-neutral nature where possible.
+
+10. Editorial recommendations are allowed only when
+    clearly framed as recommendations, not facts.
+
+11. Do not include citations or URLs.
+
+Return the complete revised MasterContentDraft as
+structured JSON only.
+"""
+
+
