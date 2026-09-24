@@ -103,6 +103,10 @@ class InstagramPublisher:
                 )
             )
 
+            self.client.wait_until_ready(
+                container_id
+            )
+
             media_id = (
                 self.client
                 .publish_container(
@@ -130,12 +134,20 @@ class InstagramPublisher:
 
         for media_url in media_urls:
 
-            child_container_ids.append(
+            child_container_id = (
                 self.client
                 .create_image_container(
                     image_url=media_url,
                     is_carousel_item=True,
                 )
+            )
+
+            self.client.wait_until_ready(
+                child_container_id
+            )
+
+            child_container_ids.append(
+                child_container_id
             )
 
         parent_container_id = (
@@ -146,6 +158,10 @@ class InstagramPublisher:
                 ),
                 caption=caption,
             )
+        )
+
+        self.client.wait_until_ready(
+            parent_container_id
         )
 
         media_id = (
