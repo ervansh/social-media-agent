@@ -291,6 +291,21 @@ def print_final_output(
             )
         )
 
+        platforms = (
+            selected_idea.get(
+                "recommended_platforms",
+                [],
+            )
+        )
+
+        if platforms:
+            print(
+                "Platforms:",
+                ", ".join(
+                    platforms
+                ),
+            )
+
     # ------------------------------------------------------
     # Strategy
     # ------------------------------------------------------
@@ -402,6 +417,32 @@ def print_final_output(
                 ):
 
                     print(f"  - {point}")
+
+        key_takeaways = master_content.get(
+            "key_takeaways",
+            [],
+        )
+
+        if key_takeaways:
+
+            print("\nKey Takeaways:")
+
+            for takeaway in key_takeaways:
+                print(
+                    f"  - {takeaway}"
+                )
+
+        call_to_action = master_content.get(
+            "call_to_action",
+            "",
+        )
+
+        if call_to_action:
+
+            print(
+                "\nCall to Action:",
+                call_to_action,
+            )
 
     # ------------------------------------------------------
     # Grounding
