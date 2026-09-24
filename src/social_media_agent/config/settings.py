@@ -82,9 +82,23 @@ class Settings(BaseSettings):
     openai_image_output_format: str = "png"
 
     publishing_mode: str = "dry_run"
+
+    public_media_base_url: str | None = None
+
     x_api_base_url: str = "https://api.x.com/2"
     x_user_access_token: str | None = None
     x_request_timeout_seconds: int = 60
+
+    instagram_api_base_url: str = (
+        "https://graph.facebook.com"
+    )
+    instagram_api_version: str = "v26.0"
+    instagram_user_id: str | None = None
+    instagram_access_token: str | None = None
+    instagram_request_timeout_seconds: int = 60
+    instagram_max_carousel_items: int = 10
+    instagram_container_poll_interval_seconds: int = 2
+    instagram_container_max_poll_attempts: int = 30
 
     grounding_timeout_seconds: int = 300
     grounding_max_output_tokens: int = 1400
