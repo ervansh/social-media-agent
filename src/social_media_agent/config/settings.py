@@ -120,7 +120,13 @@ class Settings(BaseSettings):
     quality_timeout_seconds: int = 300
     quality_max_output_tokens: int = 900
     creative_timeout_seconds: int = 300
+
+    # Legacy shared budget retained for compatibility.
     creative_max_output_tokens: int = 1200
+
+    creative_source_context_max_chars: int = 2500
+    creative_image_brief_max_output_tokens: int = 700
+    creative_storyboard_max_output_tokens: int = 900
 
     instagram_reel_scene_count: int = 5
     
