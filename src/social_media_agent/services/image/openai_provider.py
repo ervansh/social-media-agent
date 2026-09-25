@@ -23,6 +23,8 @@ class OpenAIImageAPIError(
 
 class OpenAIImageProvider:
 
+    PROVIDER_NAME = "openai"
+
     GENERATION_ENDPOINT = "/images/generations"
 
     GPT_IMAGE_25_MODELS = {
