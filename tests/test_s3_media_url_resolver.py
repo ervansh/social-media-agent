@@ -10,6 +10,18 @@ class FakeS3Client:
     def __init__(self):
         self.uploads = []
         self.presigned_calls = []
+        self.head_bucket_calls = []
+
+    def head_bucket(
+        self,
+        *,
+        Bucket,
+    ):
+        self.head_bucket_calls.append(
+            Bucket
+        )
+
+        return {}
 
     def upload_file(
         self,
@@ -149,3 +161,24 @@ def test_s3_resolver_requires_existing_local_file(
         raise AssertionError(
             "Expected FileNotFoundError"
         )
+
+
+
+def test_s3_resolver_verifies_bucket_access(
+    tmp_path,
+):
+
+    client = FakeS3Client()
+
+    resolver = S3MediaUrlResolver(
+        bucket="test-bucket",
+        local_root=tmp_path,
+        client=client,
+    )
+
+    resolver.verify_access()
+
+    assert (
+        client.head_bucket_calls
+        == ["test-bucket"]
+    )
