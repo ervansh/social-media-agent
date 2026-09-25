@@ -80,6 +80,8 @@ class Settings(BaseSettings):
 
     openai_image_quality: str = "medium"
     openai_image_output_format: str = "jpeg"
+    openai_image_background: str = "opaque"
+    openai_image_output_compression: int = 90
 
     publishing_mode: str = "dry_run"
 
