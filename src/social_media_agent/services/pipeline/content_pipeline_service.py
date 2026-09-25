@@ -78,6 +78,9 @@ from social_media_agent.models.content_idea import ContentIdea
 from social_media_agent.models.content_strategy import ContentStrategy
 from social_media_agent.models.creative_assets import CreativeAssetBundle
 from social_media_agent.models.grounding import GroundingReport
+from social_media_agent.models.generated_assets import (
+    GeneratedAssetBundle,
+)
 from social_media_agent.models.master_content import MasterContent
 from social_media_agent.models.platform_content import (
     InstagramPackage,
@@ -89,6 +92,47 @@ from social_media_agent.models.research import ResearchBrief
 
 
 class ContentPipelineService:
+
+    @staticmethod
+    def _generated_assets_need_refresh(
+        *,
+        generated_payload: dict | None,
+        creative_assets: CreativeAssetBundle,
+        creative_changed: bool,
+        image_generation_service,
+    ) -> bool:
+
+        if generated_payload is None:
+            return True
+
+        if creative_changed:
+            return True
+
+        existing = (
+            GeneratedAssetBundle
+            .model_validate(
+                generated_payload
+            )
+        )
+
+        if (
+            len(existing.images)
+            != len(creative_assets.images)
+        ):
+            return True
+
+        existing_providers = {
+            image.provider
+            for image in existing.images
+        }
+
+        return (
+            existing_providers
+            != {
+                image_generation_service
+                .provider_name
+            }
+        )
 
     def __init__(
         self,
@@ -911,16 +955,38 @@ class ContentPipelineService:
 
         if self.image_generation_service is not None:
 
-            generated_assets = self.image_generation_service.generate(
-                run_id=run_id,
-                creative_assets=creative_assets,
+            generated_payload = (
+                self.persistence
+                .get_latest_payload(
+                    run_id,
+                    ArtifactType.GENERATED_ASSETS,
+                )
             )
 
-            self.persistence.save_model(
-                run_id,
-                ArtifactType.GENERATED_ASSETS,
-                generated_assets,
-            )
+            if self._generated_assets_need_refresh(
+                generated_payload=generated_payload,
+                creative_assets=creative_assets,
+                creative_changed=True,
+                image_generation_service=(
+                    self.image_generation_service
+                ),
+            ):
+
+                generated_assets = (
+                    self.image_generation_service
+                    .generate(
+                        run_id=run_id,
+                        creative_assets=(
+                            creative_assets
+                        ),
+                    )
+                )
+
+                self.persistence.save_model(
+                    run_id,
+                    ArtifactType.GENERATED_ASSETS,
+                    generated_assets,
+                )
 
         # ==================================================
         # Pipeline successfully reaches Human Review
@@ -1804,11 +1870,23 @@ class ContentPipelineService:
                 ArtifactType.GENERATED_ASSETS,
             )
 
-            if generated_payload is None or creative_changed:
+            if self._generated_assets_need_refresh(
+                generated_payload=generated_payload,
+                creative_assets=creative_assets,
+                creative_changed=creative_changed,
+                image_generation_service=(
+                    self.image_generation_service
+                ),
+            ):
 
-                generated_assets = self.image_generation_service.generate(
-                    run_id=run_id,
-                    creative_assets=creative_assets,
+                generated_assets = (
+                    self.image_generation_service
+                    .generate(
+                        run_id=run_id,
+                        creative_assets=(
+                            creative_assets
+                        ),
+                    )
                 )
 
                 self.persistence.save_model(
