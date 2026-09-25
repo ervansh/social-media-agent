@@ -377,3 +377,24 @@ def test_image_factory_selects_openai_provider(
         provider.PROVIDER_NAME
         == "openai"
     )
+
+
+def test_openai_provider_rejects_model_without_custom_dimensions(
+    monkeypatch,
+):
+
+    configure_openai_image_settings(
+        monkeypatch
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="GPT Image 2 or 2.5",
+    ):
+        OpenAIImageProvider(
+            session=FakeSession(
+                FakeResponse({})
+            ),
+            api_key="test-key",
+            model="gpt-image-1.5",
+        )
