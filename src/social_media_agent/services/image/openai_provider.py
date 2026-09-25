@@ -458,6 +458,24 @@ class OpenAIImageProvider:
         self,
     ) -> None:
 
+        supports_custom_dimensions = (
+            self.model == "gpt-image-2"
+            or self.model.startswith(
+                "gpt-image-2-"
+            )
+            or self.model.startswith(
+                "gpt-image-2.5-"
+            )
+        )
+
+        if not supports_custom_dimensions:
+            raise ValueError(
+                "This project requires an OpenAI "
+                "GPT Image 2 or 2.5 model because "
+                "social-media assets use custom "
+                "dimensions."
+            )
+
         if (
             self.output_format
             not in self.ALLOWED_OUTPUT_FORMATS
@@ -469,8 +487,9 @@ class OpenAIImageProvider:
 
         allowed_quality = (
             self.GPT_IMAGE_25_QUALITY
-            if self.model
-            in self.GPT_IMAGE_25_MODELS
+            if self.model.startswith(
+                "gpt-image-2.5-"
+            )
             else self.ALLOWED_QUALITY
         )
 
