@@ -45,10 +45,27 @@ class CreativeImageGenerationService:
 
         for brief in creative_assets.images:
 
-            prompt = brief.image_prompt
+            prompt_parts = [
+                brief.image_prompt.strip()
+            ]
+
+            if brief.text_overlay:
+                prompt_parts.append(
+                    "Render the following text "
+                    "exactly once, clearly and "
+                    "legibly: "
+                    f'\"{brief.text_overlay.strip()}\"'
+                )
 
             if brief.negative_prompt:
-                prompt += "\n\nAvoid the following: " f"{brief.negative_prompt}"
+                prompt_parts.append(
+                    "Avoid the following: "
+                    f"{brief.negative_prompt.strip()}"
+                )
+
+            prompt = "\n\n".join(
+                prompt_parts
+            )
 
             result = self.provider.generate(
                 prompt=prompt,
