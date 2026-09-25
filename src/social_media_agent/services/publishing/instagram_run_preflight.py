@@ -1,5 +1,9 @@
 from dataclasses import dataclass, field
+from pathlib import PurePosixPath
 
+from social_media_agent.config.settings import (
+    settings,
+)
 from social_media_agent.models.generated_assets import (
     GeneratedAssetBundle,
 )
@@ -20,25 +24,38 @@ class InstagramRunPreflightResult:
     account_id: str
     username: str
     media_count: int | None
+    media_provider: str
+    image_providers: list[str] = field(
+        default_factory=list
+    )
     media_storage_keys: list[str] = field(
         default_factory=list
     )
     media_urls: list[str] = field(
         default_factory=list
     )
+    storage_verified: bool = False
 
     @property
     def ready(self) -> bool:
         return bool(
             self.account_id
             and self.username
+            and self.storage_verified
             and self.media_storage_keys
+            and len(self.image_providers)
+            == 1
             and len(self.media_urls)
             == len(self.media_storage_keys)
         )
 
 
 class InstagramRunPreflightService:
+
+    JPEG_EXTENSIONS = {
+        ".jpg",
+        ".jpeg",
+    }
 
     def __init__(
         self,
@@ -111,35 +128,138 @@ class InstagramRunPreflightService:
             )
         )
 
-        storage_keys = [
-            asset.storage_key
+        instagram_assets = [
+            asset
             for asset in bundle.images
             if asset.platform
             == "instagram"
         ]
 
-        if not storage_keys:
+        if not instagram_assets:
             raise ValueError(
                 "This run has no generated "
                 "Instagram images."
             )
 
+        if (
+            len(instagram_assets)
+            > settings
+            .instagram_max_carousel_items
+        ):
+            raise ValueError(
+                "Instagram preflight found "
+                f"{len(instagram_assets)} images, "
+                "but the configured carousel limit "
+                "is "
+                f"{settings.instagram_max_carousel_items}."
+            )
+
+        invalid_media = [
+            asset.storage_key
+            for asset in instagram_assets
+            if (
+                PurePosixPath(
+                    asset.storage_key.replace(
+                        "\\",
+                        "/",
+                    )
+                )
+                .suffix
+                .lower()
+                not in self.JPEG_EXTENSIONS
+            )
+        ]
+
+        if invalid_media:
+            raise ValueError(
+                "Instagram preflight requires "
+                "JPEG media. Unsupported assets: "
+                + ", ".join(
+                    invalid_media
+                )
+            )
+
+        image_providers = sorted(
+            {
+                asset.provider
+                for asset
+                in instagram_assets
+            }
+        )
+
+        if len(image_providers) != 1:
+            raise ValueError(
+                "Instagram generated media must "
+                "come from one consistent image "
+                "provider. Found: "
+                + ", ".join(
+                    image_providers
+                )
+            )
+
+        if (
+            settings.publishing_mode
+            .strip()
+            .lower()
+            == "live"
+            and image_providers
+            == [
+                "development"
+            ]
+        ):
+            raise ValueError(
+                "Development placeholder images "
+                "cannot be used for live Instagram "
+                "publishing. Generate production "
+                "images first."
+            )
+
+        resolver = (
+            self.preflight
+            .media_url_resolver
+        )
+
+        media_provider = str(
+            getattr(
+                resolver,
+                "PROVIDER_NAME",
+                resolver.__class__.__name__,
+            )
+        )
+
+        verify_access = getattr(
+            resolver,
+            "verify_access",
+            None,
+        )
+
+        if callable(
+            verify_access
+        ):
+            verify_access()
+
         account_result = (
             self.preflight.verify()
         )
+
+        storage_keys = [
+            asset.storage_key
+            for asset
+            in instagram_assets
+        ]
 
         media_urls = []
 
         for storage_key in storage_keys:
 
-            media_result = (
+            media_url = (
                 self.preflight.verify_media(
                     storage_key=storage_key
                 )
             )
 
             media_urls.append(
-                media_result
+                media_url
             )
 
         return InstagramRunPreflightResult(
@@ -153,8 +273,15 @@ class InstagramRunPreflightService:
             media_count=(
                 account_result.media_count
             ),
+            media_provider=(
+                media_provider
+            ),
+            image_providers=(
+                image_providers
+            ),
             media_storage_keys=(
                 storage_keys
             ),
             media_urls=media_urls,
+            storage_verified=True,
         )
