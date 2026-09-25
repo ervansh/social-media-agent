@@ -1,3 +1,5 @@
+import pytest
+
 from social_media_agent.models.creative_assets import (
     CreativeAssetBundle,
     ImageBrief,
@@ -119,3 +121,86 @@ def test_creative_image_generation_service(
         "clutter, unreadable text"
         in prompt
     )
+
+
+class FailOnSecondImageProvider:
+
+    PROVIDER_NAME = "fake"
+
+    def __init__(self):
+        self.calls = 0
+
+    def generate(
+        self,
+        prompt,
+        width,
+        height,
+    ):
+        self.calls += 1
+
+        if self.calls == 2:
+            raise RuntimeError(
+                "provider failure"
+            )
+
+        return ImageGenerationResult(
+            image_bytes=b"first-image",
+            width=width,
+            height=height,
+            provider="fake",
+            model="fake-model",
+            file_extension="jpeg",
+        )
+
+
+def test_creative_image_generation_cleans_partial_files_on_failure(
+    tmp_path,
+):
+
+    creative_assets = CreativeAssetBundle(
+        images=[
+            ImageBrief(
+                platform="instagram",
+                asset_type="carousel_slide_1",
+                width=1080,
+                height=1350,
+                objective="Slide one",
+                visual_concept="Concept one",
+                image_prompt="Prompt one",
+            ),
+            ImageBrief(
+                platform="instagram",
+                asset_type="carousel_slide_2",
+                width=1080,
+                height=1350,
+                objective="Slide two",
+                visual_concept="Concept two",
+                image_prompt="Prompt two",
+            ),
+        ]
+    )
+
+    service = CreativeImageGenerationService(
+        provider=FailOnSecondImageProvider(),
+        output_root=tmp_path,
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="provider failure",
+    ):
+        service.generate(
+            run_id="test-run",
+            creative_assets=creative_assets,
+        )
+
+    run_directory = (
+        tmp_path
+        / "test-run"
+    )
+
+    assert run_directory.exists()
+
+    assert list(
+        run_directory.iterdir()
+    ) == []
