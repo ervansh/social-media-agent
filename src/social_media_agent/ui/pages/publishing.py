@@ -224,8 +224,8 @@ Current publishing support:
                         "completed but is not ready."
                     )
 
-                col1, col2, col3 = (
-                    st.columns(3)
+                col1, col2, col3, col4 = (
+                    st.columns(4)
                 )
 
                 col1.metric(
@@ -247,9 +247,30 @@ Current publishing support:
                     ),
                 )
 
+                col4.metric(
+                    "Storage",
+                    (
+                        "READY"
+                        if result.storage_verified
+                        else "NOT READY"
+                    ),
+                )
+
                 st.caption(
                     "Instagram User ID: "
                     f"{result.account_id}"
+                )
+
+                st.caption(
+                    "Image provider: "
+                    + ", ".join(
+                        result.image_providers
+                    )
+                )
+
+                st.caption(
+                    "Media delivery provider: "
+                    f"{result.media_provider}"
                 )
 
                 if (
