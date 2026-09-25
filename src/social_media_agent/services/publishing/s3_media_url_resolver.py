@@ -12,6 +12,8 @@ from social_media_agent.services.publishing.media_url_resolver import (
 
 class S3MediaUrlResolver:
 
+    PROVIDER_NAME = "s3"
+
     def __init__(
         self,
         *,
@@ -77,6 +79,24 @@ class S3MediaUrlResolver:
             if client is not None
             else self._build_client()
         )
+
+    def verify_access(
+        self,
+    ) -> None:
+
+        try:
+            self.client.head_bucket(
+                Bucket=self.bucket
+            )
+
+        except Exception as exc:
+            raise RuntimeError(
+                "S3 bucket preflight failed. "
+                f"Bucket='{self.bucket}'. "
+                "Verify AWS credentials, region, "
+                "bucket name, and s3:ListBucket "
+                "permission."
+            ) from exc
 
     def resolve(
         self,
@@ -184,6 +204,7 @@ class S3MediaUrlResolver:
 
         try:
             import boto3
+            from botocore.config import Config
 
         except ImportError as exc:
             raise RuntimeError(
@@ -203,6 +224,17 @@ class S3MediaUrlResolver:
             kwargs[
                 "endpoint_url"
             ] = self.endpoint_url
+
+        else:
+            kwargs[
+                "config"
+            ] = Config(
+                signature_version="s3v4",
+                s3={
+                    "addressing_style":
+                        "virtual",
+                },
+            )
 
         return boto3.client(
             "s3",
