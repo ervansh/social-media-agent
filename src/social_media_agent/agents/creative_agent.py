@@ -1,4 +1,7 @@
-from pydantic import BaseModel
+from pydantic import (
+    BaseModel,
+    Field,
+)
 
 from social_media_agent.config.settings import settings
 from social_media_agent.models.content_strategy import (
@@ -27,21 +30,66 @@ from social_media_agent.services.llm.base import (
 # Internal LLM response models
 #
 # IMPORTANT:
-# The LLM does NOT decide platform, asset_type or dimensions.
-# Those values are deterministic and assigned by Python.
+# The LLM does NOT decide platform, asset_type, dimensions,
+# or storyboard scene numbers. Python owns those values.
+#
+# All free-text fields are bounded in the JSON schema so
+# structured generation cannot expand until num_predict
+# truncates the response mid-JSON.
 # ==========================================================
 
 
 class _ImageBriefDraft(BaseModel):
-    objective: str
-    visual_concept: str
-    text_overlay: str | None = None
-    image_prompt: str
-    negative_prompt: str | None = None
+    objective: str = Field(
+        min_length=1,
+        max_length=180,
+    )
+
+    visual_concept: str = Field(
+        min_length=1,
+        max_length=360,
+    )
+
+    text_overlay: str | None = Field(
+        default=None,
+        max_length=80,
+    )
+
+    image_prompt: str = Field(
+        min_length=1,
+        max_length=900,
+    )
+
+    negative_prompt: str | None = Field(
+        default=None,
+        max_length=300,
+    )
+
+
+class _StoryboardSceneDraft(BaseModel):
+    narration: str = Field(
+        min_length=1,
+        max_length=220,
+    )
+
+    visual_direction: str = Field(
+        min_length=1,
+        max_length=320,
+    )
+
+    on_screen_text: str | None = Field(
+        default=None,
+        max_length=100,
+    )
 
 
 class _StoryboardDraft(BaseModel):
-    scenes: list[StoryboardScene]
+    scenes: list[
+        _StoryboardSceneDraft
+    ] = Field(
+        min_length=settings.instagram_reel_scene_count,
+        max_length=settings.instagram_reel_scene_count,
+    )
 
 
 class CreativeAgent:
@@ -51,6 +99,42 @@ class CreativeAgent:
         llm: LLMProvider,
     ):
         self.llm = llm
+
+    # ======================================================
+    # Shared helpers
+    # ======================================================
+
+    @staticmethod
+    def _bounded_context(
+        source_context: str,
+    ) -> str:
+
+        normalized = " ".join(
+            source_context.split()
+        )
+
+        limit = (
+            settings
+            .creative_source_context_max_chars
+        )
+
+        if len(normalized) <= limit:
+            return normalized
+
+        truncated = normalized[
+            :limit
+        ]
+
+        if " " in truncated:
+            truncated = truncated.rsplit(
+                " ",
+                1,
+            )[0]
+
+        return (
+            truncated.rstrip()
+            + "..."
+        )
 
     # ======================================================
     # Image Brief
@@ -67,10 +151,16 @@ class CreativeAgent:
         tone: str,
     ) -> ImageBrief:
 
+        bounded_context = (
+            self._bounded_context(
+                source_context
+            )
+        )
+
         prompt = f"""
 You are a creative director for social media.
 
-Create ONE visual image brief.
+Create exactly ONE concise visual image brief.
 
 PLATFORM:
 {platform}
@@ -82,10 +172,17 @@ TONE:
 {tone}
 
 SOURCE CONTENT:
+{bounded_context}
 
-{source_context}
+STRICT OUTPUT LIMITS:
 
-RULES:
+- objective: maximum 180 characters.
+- visual_concept: maximum 360 characters.
+- text_overlay: maximum 80 characters.
+- image_prompt: maximum 900 characters.
+- negative_prompt: maximum 300 characters.
+
+CONTENT RULES:
 
 - Create exactly one image concept.
 - Do not create a storyboard.
@@ -94,11 +191,14 @@ RULES:
   people, companies, studies, or examples.
 - Visualize only information contained in SOURCE CONTENT.
 - Keep text overlay short.
-- Keep image_prompt visually specific but concise.
-- Keep negative_prompt concise.
-- Do not explain your reasoning.
+- Describe composition, subject, setting, lighting,
+  visual hierarchy, and style concisely.
+- Do not write explanations, disclaimers, conclusions,
+  marketing copy, or paragraphs of analysis.
+- Do not repeat SOURCE CONTENT.
 - Do not include platform dimensions.
 - Do not include platform or asset_type in the response.
+- Fill only the JSON schema fields.
 
 Return structured JSON only.
 """
@@ -110,7 +210,8 @@ Return structured JSON only.
                 settings.creative_timeout_seconds
             ),
             max_output_tokens=(
-                settings.creative_max_output_tokens
+                settings
+                .creative_image_brief_max_output_tokens
             ),
         )
 
@@ -139,6 +240,12 @@ Return structured JSON only.
         tone: str,
     ) -> VideoStoryboard:
 
+        bounded_context = (
+            self._bounded_context(
+                source_context
+            )
+        )
+
         prompt = f"""
 You are a creative director creating a short-form
 social media video storyboard.
@@ -153,25 +260,30 @@ TONE:
 {tone}
 
 SOURCE CONTENT:
-
-{source_context}
+{bounded_context}
 
 Create exactly
 {settings.instagram_reel_scene_count}
 concise storyboard scenes.
 
-RULES:
+STRICT OUTPUT LIMITS PER SCENE:
+
+- narration: maximum 220 characters.
+- visual_direction: maximum 320 characters.
+- on_screen_text: maximum 100 characters.
+
+CONTENT RULES:
 
 - Use only SOURCE CONTENT.
 - Do not introduce new factual claims.
 - Do not invent statistics or product capabilities.
-- Keep narration concise.
-- Keep visual_direction concise.
-- Keep on_screen_text short.
-- Each scene must have a unique scene_number.
+- Keep every scene concise and visually distinct.
+- Do not include scene numbers in generated content;
+  Python assigns them deterministically.
 - Do not generate image briefs.
 - Do not include platform or asset_type in the response.
 - Do not explain your reasoning.
+- Fill only the JSON schema fields.
 
 Return structured JSON only.
 """
@@ -183,13 +295,27 @@ Return structured JSON only.
                 settings.creative_timeout_seconds
             ),
             max_output_tokens=(
-                settings.creative_max_output_tokens
+                settings
+                .creative_storyboard_max_output_tokens
             ),
         )
 
-        # Deterministic upper bound.
-        scenes = draft.scenes[
-            : settings.instagram_reel_scene_count
+        scenes = [
+            StoryboardScene(
+                scene_number=index,
+                narration=scene.narration,
+                visual_direction=(
+                    scene.visual_direction
+                ),
+                on_screen_text=(
+                    scene.on_screen_text
+                ),
+            )
+            for index, scene
+            in enumerate(
+                draft.scenes,
+                start=1,
+            )
         ]
 
         return VideoStoryboard(
@@ -216,9 +342,6 @@ Return structured JSON only.
 
         # ==================================================
         # YouTube
-        #
-        # Only thumbnail image.
-        # No YouTube storyboard is generated here.
         # ==================================================
 
         if youtube is not None:
@@ -253,9 +376,7 @@ CORE MESSAGE:
 
         # ==================================================
         # Instagram Carousel
-        #
-        # One small structured call PER SLIDE.
-        # This prevents giant JSON responses.
+        # One bounded structured call per slide.
         # ==================================================
 
         if instagram is not None:
@@ -295,12 +416,6 @@ CORE MESSAGE:
                         tone=strategy.tone,
                     )
                 )
-
-            # ==============================================
-            # Instagram Reel
-            #
-            # Separate storyboard call.
-            # ==============================================
 
             reel_context = f"""
 REEL HOOK:
@@ -349,10 +464,6 @@ CORE MESSAGE:
                     tone=strategy.tone,
                 )
             )
-
-        # ==================================================
-        # Assemble bundle deterministically
-        # ==================================================
 
         return CreativeAssetBundle(
             images=images,
