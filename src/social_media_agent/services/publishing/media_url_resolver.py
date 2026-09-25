@@ -67,6 +67,8 @@ def normalize_storage_key(
 
 class PublicBaseUrlMediaUrlResolver:
 
+    PROVIDER_NAME = "public_base_url"
+
     def __init__(
         self,
         base_url: str | None = None,
