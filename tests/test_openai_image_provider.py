@@ -7,6 +7,9 @@ from PIL import Image
 from social_media_agent.config.settings import (
     settings,
 )
+from social_media_agent.services.image.factory import (
+    get_image_provider,
+)
 from social_media_agent.services.image.openai_provider import (
     OpenAIImageAPIError,
     OpenAIImageProvider,
@@ -335,3 +338,42 @@ def test_openai_provider_rejects_transparent_jpeg(
             api_key="test-key",
             model="gpt-image-2.5-flare",
         )
+
+
+def test_image_factory_selects_openai_provider(
+    monkeypatch,
+):
+
+    configure_openai_image_settings(
+        monkeypatch
+    )
+
+    monkeypatch.setattr(
+        settings,
+        "image_provider",
+        "openai",
+    )
+
+    monkeypatch.setattr(
+        settings,
+        "openai_api_key",
+        "test-key",
+    )
+
+    monkeypatch.setattr(
+        settings,
+        "openai_image_model",
+        "gpt-image-2.5-flare",
+    )
+
+    provider = get_image_provider()
+
+    assert isinstance(
+        provider,
+        OpenAIImageProvider,
+    )
+
+    assert (
+        provider.PROVIDER_NAME
+        == "openai"
+    )
