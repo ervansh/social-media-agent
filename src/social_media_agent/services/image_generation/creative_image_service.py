@@ -28,6 +28,27 @@ class CreativeImageGenerationService:
 
         self.output_root = Path(output_root or settings.generated_assets_dir)
 
+    @property
+    def provider_name(
+        self,
+    ) -> str:
+
+        provider_name = getattr(
+            self.provider,
+            "PROVIDER_NAME",
+            None,
+        )
+
+        if not provider_name:
+            raise RuntimeError(
+                "Image provider must expose "
+                "PROVIDER_NAME."
+            )
+
+        return str(
+            provider_name
+        )
+
     def generate(
         self,
         run_id: str,
