@@ -26,7 +26,10 @@ class CreativeImageGenerationService:
     ):
         self.provider = provider
 
-        self.output_root = Path(output_root or settings.generated_assets_dir)
+        self.output_root = Path(
+            output_root
+            or settings.generated_assets_dir
+        )
 
     @property
     def provider_name(
@@ -55,76 +58,135 @@ class CreativeImageGenerationService:
         creative_assets: CreativeAssetBundle,
     ) -> GeneratedAssetBundle:
 
-        generated_images: list[GeneratedImageAsset] = []
+        generated_images: list[
+            GeneratedImageAsset
+        ] = []
 
-        run_directory = self.output_root / run_id
+        created_files: list[
+            Path
+        ] = []
+
+        run_directory = (
+            self.output_root
+            / run_id
+        )
 
         run_directory.mkdir(
             parents=True,
             exist_ok=True,
         )
 
-        for brief in creative_assets.images:
+        try:
 
-            prompt_parts = [
-                brief.image_prompt.strip()
-            ]
+            for brief in creative_assets.images:
 
-            if brief.text_overlay:
-                prompt_parts.append(
-                    "Render the following text "
-                    "exactly once, clearly and "
-                    "legibly: "
-                    f'\"{brief.text_overlay.strip()}\"'
+                prompt_parts = [
+                    brief.image_prompt.strip()
+                ]
+
+                if brief.text_overlay:
+                    prompt_parts.append(
+                        "Render the following text "
+                        "exactly once, clearly and "
+                        "legibly: "
+                        f'\"{brief.text_overlay.strip()}\"'
+                    )
+
+                if brief.negative_prompt:
+                    prompt_parts.append(
+                        "Avoid the following: "
+                        f"{brief.negative_prompt.strip()}"
+                    )
+
+                prompt = "\n\n".join(
+                    prompt_parts
                 )
 
-            if brief.negative_prompt:
-                prompt_parts.append(
-                    "Avoid the following: "
-                    f"{brief.negative_prompt.strip()}"
+                result = (
+                    self.provider.generate(
+                        prompt=prompt,
+                        width=brief.width,
+                        height=brief.height,
+                    )
                 )
 
-            prompt = "\n\n".join(
-                prompt_parts
-            )
+                if not result.image_bytes:
+                    raise RuntimeError(
+                        "Image provider returned "
+                        "empty image bytes."
+                    )
 
-            result = self.provider.generate(
-                prompt=prompt,
-                width=brief.width,
-                height=brief.height,
-            )
-
-            asset_type = self._safe_name(brief.asset_type)
-
-            filename = (
-                f"{brief.platform}_"
-                f"{asset_type}_"
-                f"{uuid4().hex[:12]}"
-                f".{result.file_extension}"
-            )
-
-            file_path = run_directory / filename
-
-            file_path.write_bytes(result.image_bytes)
-
-            storage_key = str(Path(run_id) / filename)
-
-            generated_images.append(
-                GeneratedImageAsset(
-                    platform=brief.platform,
-                    asset_type=brief.asset_type,
-                    storage_key=storage_key,
-                    provider=result.provider,
-                    model=result.model,
-                    requested_width=brief.width,
-                    requested_height=brief.height,
-                    generated_width=result.width,
-                    generated_height=result.height,
-                    prompt=prompt,
+                asset_type = self._safe_name(
+                    brief.asset_type
                 )
-            )
 
-        return GeneratedAssetBundle(images=generated_images)
+                filename = (
+                    f"{brief.platform}_"
+                    f"{asset_type}_"
+                    f"{uuid4().hex[:12]}"
+                    f".{result.file_extension}"
+                )
+
+                file_path = (
+                    run_directory
+                    / filename
+                )
+
+                file_path.write_bytes(
+                    result.image_bytes
+                )
+
+                created_files.append(
+                    file_path
+                )
+
+                storage_key = str(
+                    Path(run_id)
+                    / filename
+                )
+
+                generated_images.append(
+                    GeneratedImageAsset(
+                        platform=brief.platform,
+                        asset_type=(
+                            brief.asset_type
+                        ),
+                        storage_key=storage_key,
+                        provider=result.provider,
+                        model=result.model,
+                        requested_width=(
+                            brief.width
+                        ),
+                        requested_height=(
+                            brief.height
+                        ),
+                        generated_width=(
+                            result.width
+                        ),
+                        generated_height=(
+                            result.height
+                        ),
+                        prompt=prompt,
+                    )
+                )
+
+        except Exception:
+
+            for file_path in reversed(
+                created_files
+            ):
+                try:
+                    file_path.unlink(
+                        missing_ok=True
+                    )
+                except OSError:
+                    pass
+
+            raise
+
+        return GeneratedAssetBundle(
+            images=generated_images
+        )
 
     @staticmethod
     def _safe_name(
