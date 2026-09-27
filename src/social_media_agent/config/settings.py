@@ -85,6 +85,8 @@ class Settings(BaseSettings):
 
     publishing_mode: str = "dry_run"
 
+    media_store_provider: str = "local"
+
     media_url_provider: str = "public_base_url"
     public_media_base_url: str | None = None
 
