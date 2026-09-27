@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from social_media_agent.config.settings import (
     settings,
 )
@@ -9,7 +11,10 @@ from social_media_agent.services.media_store.s3_store import (
 )
 
 
-def get_media_store():
+def get_media_store(
+    *,
+    local_root: str | Path | None = None,
+):
 
     provider = (
         settings.media_store_provider
@@ -18,10 +23,14 @@ def get_media_store():
     )
 
     if provider == "local":
-        return LocalMediaStore()
+        return LocalMediaStore(
+            local_root=local_root
+        )
 
     if provider == "s3":
-        return S3MediaStore()
+        return S3MediaStore(
+            local_root=local_root
+        )
 
     raise ValueError(
         "Unsupported MEDIA_STORE_PROVIDER: "
