@@ -110,6 +110,35 @@ class ContentRepository:
 
             return artifact
 
+    def get_artifact_version(
+        self,
+        run_id: str,
+        artifact_type: str,
+        version: int,
+        platform: str | None = None,
+    ) -> ArtifactRecord | None:
+
+        with self.session_factory() as session:
+
+            query = (
+                select(ArtifactRecord)
+                .where(
+                    ArtifactRecord.run_id
+                    == run_id,
+                    ArtifactRecord.artifact_type
+                    == artifact_type,
+                    ArtifactRecord.platform
+                    == platform,
+                    ArtifactRecord.version
+                    == version,
+                )
+                .limit(1)
+            )
+
+            return session.scalar(
+                query
+            )
+
     def get_latest_artifact(
         self,
         run_id: str,
