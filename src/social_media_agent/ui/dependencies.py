@@ -46,6 +46,12 @@ from social_media_agent.services.publishing.instagram_run_preflight import (
 from social_media_agent.services.publishing.media_url_factory import (
     get_media_url_resolver,
 )
+from social_media_agent.services.publishing.manual_publish_package_service import (
+    ManualPublishPackageService,
+)
+from social_media_agent.services.media_store.factory import (
+    get_media_store,
+)
 from social_media_agent.services.review_service import (
     ReviewService,
 )
@@ -71,6 +77,24 @@ def get_instagram_run_preflight_service():
             media_url_resolver=(
                 get_media_url_resolver()
             ),
+        ),
+    )
+
+
+@st.cache_resource
+def get_manual_publish_package_service():
+
+    return ManualPublishPackageService(
+        persistence=(
+            get_persistence_service()
+        ),
+        media_store=(
+            get_media_store(
+                local_root=(
+                    settings
+                    .publish_packages_dir
+                )
+            )
         ),
     )
 
