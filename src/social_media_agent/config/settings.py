@@ -66,6 +66,10 @@ class Settings(BaseSettings):
         "data/output/generated_assets"
     )
 
+    publish_packages_dir: str = (
+        "data/output/publish_packages"
+    )
+
     image_generation_timeout_seconds: int = 300
     image_size_multiple: int = 16
 
