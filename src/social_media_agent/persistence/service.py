@@ -6,9 +6,25 @@ from social_media_agent.persistence.artifact_types import (
 from social_media_agent.persistence.repository import (
     ContentRepository,
 )
+from social_media_agent.persistence.run_status import (
+    RunStatus,
+)
 
 
 class PersistenceService:
+
+    REVIEW_SENSITIVE_ARTIFACTS = {
+        ArtifactType.RESEARCH.value,
+        ArtifactType.SELECTED_IDEA.value,
+        ArtifactType.STRATEGY.value,
+        ArtifactType.MASTER_CONTENT.value,
+        ArtifactType.GROUNDING_REPORT.value,
+        ArtifactType.PLATFORM_CONTENT.value,
+        ArtifactType.PLATFORM_GROUNDING_REPORT.value,
+        ArtifactType.QUALITY_REPORT.value,
+        ArtifactType.CREATIVE_ASSETS.value,
+        ArtifactType.GENERATED_ASSETS.value,
+    }
 
     def __init__(
         self,
@@ -56,6 +72,11 @@ class PersistenceService:
             payload=model.model_dump(mode="json"),
         )
 
+        self._invalidate_approval_if_needed(
+            run_id=run_id,
+            artifact_type=artifact_type.value,
+        )
+
     def save_payload(
         self,
         run_id: str,
@@ -79,6 +100,74 @@ class PersistenceService:
             platform=platform,
             payload=payload,
         )
+
+        self._invalidate_approval_if_needed(
+            run_id=run_id,
+            artifact_type=artifact_name,
+        )
+
+    def get_payload_at_version(
+        self,
+        run_id: str,
+        artifact_type: ArtifactType | str,
+        version: int,
+        platform: str | None = None,
+    ) -> dict | None:
+
+        artifact_name = (
+            artifact_type.value
+            if isinstance(
+                artifact_type,
+                ArtifactType,
+            )
+            else artifact_type
+        )
+
+        artifact = (
+            self.repository
+            .get_artifact_version(
+                run_id=run_id,
+                artifact_type=artifact_name,
+                version=version,
+                platform=platform,
+            )
+        )
+
+        if artifact is None:
+            return None
+
+        return artifact.payload
+
+    def _invalidate_approval_if_needed(
+        self,
+        *,
+        run_id: str,
+        artifact_type: str,
+    ) -> None:
+
+        if (
+            artifact_type
+            not in self.REVIEW_SENSITIVE_ARTIFACTS
+        ):
+            return
+
+        run = self.repository.get_run(
+            run_id
+        )
+
+        if (
+            run is not None
+            and run.status
+            == RunStatus
+            .APPROVED_FOR_PUBLISHING
+            .value
+        ):
+            self.repository.update_run_status(
+                run_id,
+                RunStatus
+                .REQUIRES_REVIEW
+                .value,
+            )
 
     def get_run(
         self,
