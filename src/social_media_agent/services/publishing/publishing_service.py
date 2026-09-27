@@ -18,6 +18,9 @@ from social_media_agent.persistence.artifact_types import (
 from social_media_agent.persistence.run_status import (
     RunStatus,
 )
+from social_media_agent.services.publishing.publication_plan_service import (
+    PublicationPlanService,
+)
 
 
 class PublishingService:
@@ -29,6 +32,11 @@ class PublishingService:
     ):
         self.persistence = persistence
         self.publishers = publishers
+        self.plan_service = (
+            PublicationPlanService(
+                persistence=persistence
+            )
+        )
 
     def publish(
         self,
@@ -44,8 +52,11 @@ class PublishingService:
                 f"Content run not found: {run_id}"
             )
 
-        plan = self._load_latest_plan(
-            run_id
+        plan = (
+            self.plan_service
+            .load_latest(
+                run_id
+            )
         )
 
         if plan is None:
@@ -56,7 +67,7 @@ class PublishingService:
                 "before publishing."
             )
 
-        self._assert_plan_current(
+        self.plan_service.assert_current(
             run_id=run_id,
             plan=plan,
         )
@@ -245,67 +256,6 @@ class PublishingService:
 
         return batch
 
-    def _assert_plan_current(
-        self,
-        *,
-        run_id: str,
-        plan: PublicationPlan,
-    ) -> None:
-
-        latest = {
-            (
-                artifact.artifact_type,
-                artifact.platform,
-            ): artifact
-            for artifact
-            in self.persistence
-            .get_latest_artifacts(
-                run_id
-            )
-        }
-
-        stale_refs = []
-
-        for ref in plan.artifact_refs:
-
-            current = latest.get(
-                (
-                    ref.artifact_type,
-                    ref.platform,
-                )
-            )
-
-            if (
-                current is None
-                or current.id
-                != ref.artifact_id
-                or current.version
-                != ref.version
-            ):
-                stale_refs.append(
-                    (
-                        ref.artifact_type,
-                        ref.platform,
-                        ref.version,
-                    )
-                )
-
-        if stale_refs:
-
-            self.persistence.update_status(
-                run_id,
-                RunStatus
-                .REQUIRES_REVIEW
-                .value,
-            )
-
-            raise ValueError(
-                "Publication plan is stale "
-                "because reviewed artifacts "
-                "changed after approval. "
-                "Human review is required again."
-            )
-
     def _check_readiness(
         self,
         request: PublicationRequest,
@@ -486,29 +436,6 @@ class PublishingService:
             )
 
         return media
-
-    def _load_latest_plan(
-        self,
-        run_id: str,
-    ) -> PublicationPlan | None:
-
-        payload = (
-            self.persistence
-            .get_latest_payload(
-                run_id,
-                ArtifactType.PUBLICATION_PLAN,
-            )
-        )
-
-        if payload is None:
-            return None
-
-        return (
-            PublicationPlan
-            .model_validate(
-                payload
-            )
-        )
 
     def _load_latest_batch(
         self,
