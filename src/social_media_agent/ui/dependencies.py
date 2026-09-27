@@ -46,6 +46,9 @@ from social_media_agent.services.publishing.instagram_run_preflight import (
 from social_media_agent.services.publishing.media_url_factory import (
     get_media_url_resolver,
 )
+from social_media_agent.services.review_service import (
+    ReviewService,
+)
 
 
 @st.cache_resource
@@ -69,6 +72,16 @@ def get_instagram_run_preflight_service():
                 get_media_url_resolver()
             ),
         ),
+    )
+
+
+@st.cache_resource
+def get_review_service():
+
+    return ReviewService(
+        persistence=(
+            get_persistence_service()
+        )
     )
 
 
