@@ -20,4 +20,5 @@ class ArtifactType(StrEnum):
     GENERATED_ASSETS = "generated_assets"
     REVIEW_DECISION = "review_decision"
     PUBLICATION_PLAN = "publication_plan"
+    MANUAL_PUBLISH_PACKAGE = "manual_publish_package"
     PUBLICATION_RESULT = "publication_result"
