@@ -215,6 +215,90 @@ class PublicationPlanService:
 
         return plan
 
+    def load_latest(
+        self,
+        run_id: str,
+    ) -> PublicationPlan | None:
+
+        payload = (
+            self.persistence
+            .get_latest_payload(
+                run_id,
+                ArtifactType.PUBLICATION_PLAN,
+            )
+        )
+
+        if payload is None:
+            return None
+
+        return (
+            PublicationPlan
+            .model_validate(
+                payload
+            )
+        )
+
+    def assert_current(
+        self,
+        *,
+        run_id: str,
+        plan: PublicationPlan,
+    ) -> None:
+
+        latest = {
+            (
+                artifact.artifact_type,
+                artifact.platform,
+            ): artifact
+            for artifact
+            in self.persistence
+            .get_latest_artifacts(
+                run_id
+            )
+        }
+
+        stale_refs = []
+
+        for ref in plan.artifact_refs:
+
+            current = latest.get(
+                (
+                    ref.artifact_type,
+                    ref.platform,
+                )
+            )
+
+            if (
+                current is None
+                or current.id
+                != ref.artifact_id
+                or current.version
+                != ref.version
+            ):
+                stale_refs.append(
+                    (
+                        ref.artifact_type,
+                        ref.platform,
+                        ref.version,
+                    )
+                )
+
+        if stale_refs:
+
+            self.persistence.update_status(
+                run_id,
+                RunStatus
+                .REQUIRES_REVIEW
+                .value,
+            )
+
+            raise ValueError(
+                "Publication plan is stale "
+                "because reviewed artifacts "
+                "changed after approval. "
+                "Human review is required again."
+            )
+
     @staticmethod
     def _require_passed_report(
         by_key: dict,
