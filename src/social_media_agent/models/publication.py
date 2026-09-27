@@ -22,6 +22,10 @@ class PublicationRequest(BaseModel):
     run_id: str
     platform: Platform
 
+    publication_plan_id: str | None = None
+    content_artifact_version: int | None = None
+    generated_assets_version: int | None = None
+
     payload: dict
 
     media_storage_keys: list[str] = Field(
@@ -43,6 +47,8 @@ class PublicationResult(BaseModel):
 
 
 class PublicationBatch(BaseModel):
+    publication_plan_id: str | None = None
+
     results: list[PublicationResult] = Field(
         default_factory=list
     )
