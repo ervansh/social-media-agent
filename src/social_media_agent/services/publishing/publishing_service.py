@@ -8,6 +8,10 @@ from social_media_agent.models.publication import (
     PublicationRequest,
     PublicationResult,
 )
+from social_media_agent.models.publication_plan import (
+    ArtifactVersionRef,
+    PublicationPlan,
+)
 from social_media_agent.persistence.artifact_types import (
     ArtifactType,
 )
@@ -40,6 +44,23 @@ class PublishingService:
                 f"Content run not found: {run_id}"
             )
 
+        plan = self._load_latest_plan(
+            run_id
+        )
+
+        if plan is None:
+            raise ValueError(
+                "Publishing requires a "
+                "version-locked publication plan. "
+                "Approve the current content "
+                "before publishing."
+            )
+
+        self._assert_plan_current(
+            run_id=run_id,
+            plan=plan,
+        )
+
         if (
             run.status
             == RunStatus.PUBLISHED.value
@@ -50,7 +71,12 @@ class PublishingService:
                 )
             )
 
-            if previous is not None:
+            if (
+                previous is not None
+                and previous
+                .publication_plan_id
+                == plan.plan_id
+            ):
                 return previous
 
         if (
@@ -66,12 +92,16 @@ class PublishingService:
             )
 
         requests = self._build_requests(
-            run_id
+            run_id=run_id,
+            plan=plan,
         )
 
         previously_published = (
             self._load_published_results(
-                run_id
+                run_id=run_id,
+                publication_plan_id=(
+                    plan.plan_id
+                ),
             )
         )
 
@@ -97,9 +127,9 @@ class PublishingService:
                         ),
                         status="published",
                         message=(
-                            "Already published; "
-                            "existing publication "
-                            "result reused."
+                            "Already published for "
+                            "this publication plan; "
+                            "existing result reused."
                         ),
                         external_id=(
                             previous_result
@@ -112,6 +142,8 @@ class PublishingService:
                             ),
                             "idempotent_reuse":
                                 True,
+                            "publication_plan_id":
+                                plan.plan_id,
                         },
                     )
                 )
@@ -178,7 +210,10 @@ class PublishingService:
                 )
 
         batch = PublicationBatch(
-            results=results
+            publication_plan_id=(
+                plan.plan_id
+            ),
+            results=results,
         )
 
         self.persistence.save_model(
@@ -210,6 +245,67 @@ class PublishingService:
 
         return batch
 
+    def _assert_plan_current(
+        self,
+        *,
+        run_id: str,
+        plan: PublicationPlan,
+    ) -> None:
+
+        latest = {
+            (
+                artifact.artifact_type,
+                artifact.platform,
+            ): artifact
+            for artifact
+            in self.persistence
+            .get_latest_artifacts(
+                run_id
+            )
+        }
+
+        stale_refs = []
+
+        for ref in plan.artifact_refs:
+
+            current = latest.get(
+                (
+                    ref.artifact_type,
+                    ref.platform,
+                )
+            )
+
+            if (
+                current is None
+                or current.id
+                != ref.artifact_id
+                or current.version
+                != ref.version
+            ):
+                stale_refs.append(
+                    (
+                        ref.artifact_type,
+                        ref.platform,
+                        ref.version,
+                    )
+                )
+
+        if stale_refs:
+
+            self.persistence.update_status(
+                run_id,
+                RunStatus
+                .REQUIRES_REVIEW
+                .value,
+            )
+
+            raise ValueError(
+                "Publication plan is stale "
+                "because reviewed artifacts "
+                "changed after approval. "
+                "Human review is required again."
+            )
+
     def _check_readiness(
         self,
         request: PublicationRequest,
@@ -237,41 +333,89 @@ class PublishingService:
 
     def _build_requests(
         self,
+        *,
         run_id: str,
+        plan: PublicationPlan,
     ) -> list[PublicationRequest]:
 
         requests: list[
             PublicationRequest
         ] = []
 
-        media_by_platform = (
-            self._load_media(
-                run_id
+        generated_ref = plan.get_ref(
+            artifact_type=(
+                ArtifactType
+                .GENERATED_ASSETS
+                .value
             )
         )
 
-        for platform in (
-            "youtube",
-            "instagram",
-            "x",
-        ):
+        media_by_platform = (
+            self._load_media(
+                run_id=run_id,
+                generated_ref=(
+                    generated_ref
+                ),
+            )
+        )
+
+        for platform in plan.platforms:
+
+            content_ref = plan.get_ref(
+                artifact_type=(
+                    ArtifactType
+                    .PLATFORM_CONTENT
+                    .value
+                ),
+                platform=platform,
+            )
+
+            if content_ref is None:
+                raise ValueError(
+                    "Publication plan is missing "
+                    "platform content reference "
+                    f"for {platform}."
+                )
 
             payload = (
                 self.persistence
-                .get_latest_payload(
-                    run_id,
-                    ArtifactType.PLATFORM_CONTENT,
+                .get_payload_at_version(
+                    run_id=run_id,
+                    artifact_type=(
+                        ArtifactType
+                        .PLATFORM_CONTENT
+                    ),
                     platform=platform,
+                    version=(
+                        content_ref.version
+                    ),
                 )
             )
 
             if payload is None:
-                continue
+                raise ValueError(
+                    "Frozen platform content "
+                    "artifact could not be loaded. "
+                    f"platform={platform}, "
+                    f"version={content_ref.version}"
+                )
 
             requests.append(
                 PublicationRequest(
                     run_id=run_id,
                     platform=platform,
+                    publication_plan_id=(
+                        plan.plan_id
+                    ),
+                    content_artifact_version=(
+                        content_ref.version
+                    ),
+                    generated_assets_version=(
+                        generated_ref.version
+                        if generated_ref
+                        is not None
+                        else None
+                    ),
                     payload=(
                         self._build_platform_payload(
                             platform,
@@ -291,19 +435,34 @@ class PublishingService:
 
     def _load_media(
         self,
+        *,
         run_id: str,
+        generated_ref: ArtifactVersionRef | None,
     ) -> dict[str, list[str]]:
+
+        if generated_ref is None:
+            return {}
 
         payload = (
             self.persistence
-            .get_latest_payload(
-                run_id,
-                ArtifactType.GENERATED_ASSETS,
+            .get_payload_at_version(
+                run_id=run_id,
+                artifact_type=(
+                    ArtifactType
+                    .GENERATED_ASSETS
+                ),
+                version=(
+                    generated_ref.version
+                ),
             )
         )
 
         if payload is None:
-            return {}
+            raise ValueError(
+                "Frozen generated-assets "
+                "artifact could not be loaded. "
+                f"version={generated_ref.version}"
+            )
 
         bundle = (
             GeneratedAssetBundle
@@ -328,6 +487,29 @@ class PublishingService:
 
         return media
 
+    def _load_latest_plan(
+        self,
+        run_id: str,
+    ) -> PublicationPlan | None:
+
+        payload = (
+            self.persistence
+            .get_latest_payload(
+                run_id,
+                ArtifactType.PUBLICATION_PLAN,
+            )
+        )
+
+        if payload is None:
+            return None
+
+        return (
+            PublicationPlan
+            .model_validate(
+                payload
+            )
+        )
+
     def _load_latest_batch(
         self,
         run_id: str,
@@ -350,14 +532,20 @@ class PublishingService:
 
     def _load_published_results(
         self,
+        *,
         run_id: str,
+        publication_plan_id: str,
     ) -> dict[str, PublicationResult]:
 
         batch = self._load_latest_batch(
             run_id
         )
 
-        if batch is None:
+        if (
+            batch is None
+            or batch.publication_plan_id
+            != publication_plan_id
+        ):
             return {}
 
         return {
