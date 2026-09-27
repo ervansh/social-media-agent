@@ -7,6 +7,7 @@ from social_media_agent.persistence.artifact_types import (
 from social_media_agent.persistence.run_status import RunStatus
 from social_media_agent.ui.dependencies import (
     get_instagram_run_preflight_service,
+    get_manual_publish_package_service,
     get_persistence_service,
     get_publishing_service,
 )
@@ -146,6 +147,149 @@ Current publishing support:
 - **YouTube** — live publishing not implemented yet; requires a final video file
 """
     )
+
+    # ==================================================
+    # Manual Publish Package
+    # ==================================================
+
+    st.divider()
+
+    st.subheader(
+        "Manual Publish Package"
+    )
+
+    st.caption(
+        "Builds the exact approved content and "
+        "media package without publishing to "
+        "any social platform."
+    )
+
+    st.write(
+        f"**Media store:** "
+        f"`{settings.media_store_provider}`"
+    )
+
+    if st.button(
+        "Build Manual Publish Package",
+        use_container_width=True,
+        key=(
+            "manual_package_"
+            f"{selected_run_id}"
+        ),
+    ):
+
+        try:
+
+            with st.spinner(
+                "Building version-locked "
+                "manual publish package..."
+            ):
+
+                package_service = (
+                    get_manual_publish_package_service()
+                )
+
+                package = (
+                    package_service.build(
+                        selected_run_id
+                    )
+                )
+
+        except Exception as exc:
+
+            st.error(
+                "Manual publish package failed: "
+                f"{exc}"
+            )
+
+        else:
+
+            st.success(
+                "Manual publish package is READY."
+            )
+
+            col1, col2, col3 = (
+                st.columns(3)
+            )
+
+            col1.metric(
+                "Files",
+                len(package.files),
+            )
+
+            col2.metric(
+                "Platforms",
+                len(package.platforms),
+            )
+
+            col3.metric(
+                "Store",
+                package.store_provider,
+            )
+
+            st.caption(
+                "Publication Plan ID: "
+                f"{package.publication_plan_id}"
+            )
+
+            st.caption(
+                "Package key: "
+                f"{package.package_key}"
+            )
+
+            source_providers = sorted(
+                {
+                    file.source_provider
+                    for file
+                    in package.files
+                    if file.source_provider
+                }
+            )
+
+            if (
+                source_providers
+                == ["development"]
+            ):
+                st.warning(
+                    "This package contains "
+                    "development placeholder media. "
+                    "It is safe for workflow/manual "
+                    "testing, but replace it with "
+                    "production creative before a "
+                    "real social post."
+                )
+
+            manifest = (
+                package.manifest_file
+            )
+
+            if manifest is not None:
+                st.caption(
+                    "Manifest object: "
+                    f"{manifest.stored_media.object_key}"
+                )
+
+            with st.expander(
+                "Package files"
+            ):
+
+                for file in package.files:
+
+                    st.write(
+                        f"**{file.relative_path}**"
+                    )
+
+                    st.caption(
+                        "Role: "
+                        f"{file.role} · "
+                        "SHA-256: "
+                        f"{file.sha256[:12]}…"
+                    )
+
+                    st.code(
+                        file.stored_media.object_key,
+                        language=None,
+                    )
 
     # ==================================================
     # Instagram Preflight
