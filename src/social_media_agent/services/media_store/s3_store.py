@@ -8,7 +8,7 @@ from social_media_agent.config.settings import (
 from social_media_agent.models.stored_media import (
     StoredMediaAsset,
 )
-from social_media_agent.services.publishing.media_url_resolver import (
+from social_media_agent.services.media_store.path_utils import (
     normalize_storage_key,
 )
 
