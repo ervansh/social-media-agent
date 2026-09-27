@@ -12,6 +12,7 @@ class RunStatus(StrEnum):
     PLATFORM_CONTENT_GENERATED = "platform_content_generated"
 
     READY_FOR_HUMAN_REVIEW = "ready_for_human_review"
+    REQUIRES_REVIEW = "requires_review"
 
     APPROVED_FOR_PUBLISHING = "approved_for_publishing"
     PUBLISHED = "published"
