@@ -147,11 +147,6 @@ class S3MediaStore:
                 },
             )
 
-            metadata = self.client.head_object(
-                Bucket=self.bucket,
-                Key=object_key,
-            )
-
         except Exception as exc:
             raise RuntimeError(
                 "Failed to store media in S3. "
@@ -160,44 +155,13 @@ class S3MediaStore:
                 f"object_key={object_key}"
             ) from exc
 
-        size_bytes = metadata.get(
-            "ContentLength"
-        )
-
-        if size_bytes is None:
-            size_bytes = (
-                local_path.stat().st_size
-            )
-
-        etag = metadata.get(
-            "ETag"
-        )
-
-        if isinstance(
-            etag,
-            str,
-        ):
-            etag = etag.strip(
-                '"'
-            )
-
-        version_id = metadata.get(
-            "VersionId"
-        )
-
         return StoredMediaAsset(
             source_storage_key=normalized,
             store_provider=self.PROVIDER_NAME,
             object_key=object_key,
             content_type=content_type,
-            size_bytes=int(
-                size_bytes
-            ),
-            etag=etag,
-            version_id=(
-                str(version_id)
-                if version_id is not None
-                else None
+            size_bytes=(
+                local_path.stat().st_size
             ),
         )
 
