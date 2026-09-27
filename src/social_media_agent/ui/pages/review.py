@@ -17,6 +17,7 @@ from social_media_agent.persistence.run_status import (
 )
 from social_media_agent.ui.dependencies import (
     get_persistence_service,
+    get_review_service,
 )
 
 
@@ -164,6 +165,10 @@ def render():
 
     persistence = (
         get_persistence_service()
+    )
+
+    review_service = (
+        get_review_service()
     )
 
     runs = persistence.list_runs(
@@ -343,47 +348,44 @@ def render():
         use_container_width=True,
     ):
 
-        persistence.save_payload(
-            run_id=run.id,
-            artifact_type=(
-                ArtifactType.REVIEW_DECISION
-            ),
-            payload={
-                "decision": "approved",
-                "note": review_note,
-            },
-        )
+        try:
+            plan = (
+                review_service.approve(
+                    run_id=run.id,
+                    note=review_note,
+                )
+            )
 
-        persistence.update_status(
-            run.id,
-            RunStatus.APPROVED_FOR_PUBLISHING.value,
-        )
+        except Exception as exc:
 
-        st.success(
-            "Content approved for publishing."
-        )
+            st.error(
+                "Approval failed: "
+                f"{exc}"
+            )
 
-        st.rerun()
+        else:
+
+            st.success(
+                "Content approved and a "
+                "version-locked publication "
+                "plan was created."
+            )
+
+            st.caption(
+                "Publication Plan ID: "
+                f"{plan.plan_id}"
+            )
+
+            st.rerun()
 
     if reject_col.button(
         "Reject",
         use_container_width=True,
     ):
 
-        persistence.save_payload(
+        review_service.reject(
             run_id=run.id,
-            artifact_type=(
-                ArtifactType.REVIEW_DECISION
-            ),
-            payload={
-                "decision": "rejected",
-                "note": review_note,
-            },
-        )
-
-        persistence.update_status(
-            run.id,
-            RunStatus.REJECTED.value,
+            note=review_note,
         )
 
         st.warning(
