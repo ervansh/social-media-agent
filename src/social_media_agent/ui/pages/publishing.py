@@ -302,8 +302,8 @@ Current publishing support:
             )
 
             if (
-                source_providers
-                == ["development"]
+                "development"
+                in source_providers
             ):
                 st.warning(
                     "This package contains "
