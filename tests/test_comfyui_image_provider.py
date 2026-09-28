@@ -674,3 +674,61 @@ def test_image_factory_selects_comfyui_provider(
     assert provider.model == (
         "factory-test-model"
     )
+
+
+def test_comfyui_provider_surfaces_execution_failure(
+    tmp_path,
+    monkeypatch,
+):
+
+    configure_settings(
+        monkeypatch
+    )
+
+    workflow_path = write_workflow(
+        tmp_path
+    )
+
+    session = FakeComfySession(
+        image_bytes=b"",
+        history_payloads=[
+            {
+                "prompt-123": {
+                    "outputs": {},
+                    "status": {
+                        "completed":
+                            False,
+                        "status_str":
+                            "error",
+                        "messages": [
+                            [
+                                "execution_error",
+                                {
+                                    "exception_message":
+                                        "model load failed"
+                                },
+                            ]
+                        ],
+                    },
+                }
+            }
+        ],
+    )
+
+    provider = ComfyUIImageProvider(
+        session=session,
+        workflow_path=workflow_path,
+        model_label="test-model",
+        sleep_fn=lambda _: None,
+    )
+
+    with pytest.raises(
+        ComfyUIImageAPIError,
+        match="execution failed",
+    ):
+        provider.generate(
+            prompt="QA",
+            width=512,
+            height=512,
+        )
+
