@@ -31,6 +31,9 @@ from social_media_agent.services.pipeline.content_pipeline_service import (
 from social_media_agent.services.search.factory import (
     get_search_provider,
 )
+from social_media_agent.services.video.factory import (
+    get_video_renderer,
+)
 
 logger = configure_logging()
 
@@ -105,6 +108,15 @@ def create_image_generation_service():
     return CreativeImageGenerationService(
         provider=provider,
     )
+
+
+
+def create_video_rendering_service():
+
+    if not settings.video_rendering_enabled:
+        return None
+
+    return get_video_renderer()
 
 
 # ==========================================================
@@ -749,6 +761,7 @@ def main():
     search_provider = get_search_provider()
 
     image_generation_service = create_image_generation_service()
+    video_rendering_service = create_video_rendering_service()
 
     # ------------------------------------------------------
     # Main Pipeline Service
@@ -759,6 +772,7 @@ def main():
         search_provider=search_provider,
         persistence=persistence,
         image_generation_service=(image_generation_service),
+        video_rendering_service=(video_rendering_service),
     )
 
     # ======================================================
