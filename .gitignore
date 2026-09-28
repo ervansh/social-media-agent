@@ -31,3 +31,5 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
+# Local ComfyUI API workflow
+config/comfyui/workflow_api.json
