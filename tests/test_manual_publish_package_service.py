@@ -262,6 +262,14 @@ def build_fixture(
         b"x-image"
     )
 
+    (
+        generated_root
+        / "run-1"
+        / "reel.mp4"
+    ).write_bytes(
+        b"reel-video"
+    )
+
     instagram_payload = {
         "reel_hook":
             "Instagram hook",
@@ -366,7 +374,36 @@ def build_fixture(
                 "prompt":
                     "X prompt",
             },
-        ]
+        ],
+        "videos": [
+            {
+                "platform":
+                    "instagram",
+                "asset_type":
+                    "reel_video",
+                "storyboard_asset_type":
+                    "reel_storyboard",
+                "storage_key":
+                    "run-1/reel.mp4",
+                "provider":
+                    "ffmpeg",
+                "model":
+                    "deterministic-still-motion-v1",
+                "width":
+                    1080,
+                "height":
+                    1920,
+                "fps":
+                    30,
+                "duration_seconds":
+                    15.0,
+                "scene_count":
+                    5,
+                "source_image_storage_keys": [
+                    "run-1/ig.jpeg"
+                ],
+            }
+        ],
     }
 
     refs = [
@@ -611,6 +648,15 @@ def test_manual_package_builds_exact_approved_content_and_media(
         b"x-image"
     )
 
+    assert (
+        root
+        / "instagram"
+        / "media"
+        / "reel_video.mp4"
+    ).read_bytes() == (
+        b"reel-video"
+    )
+
     assert media_store.calls[-1] == (
         "run-1/plan-123/manifest.json"
     )
@@ -711,6 +757,12 @@ def test_manual_package_manifest_contains_hashes_and_provenance(
     assert (
         "instagram/media/"
         "carousel_slide_1.jpeg"
+        in manifest_paths
+    )
+
+    assert (
+        "instagram/media/"
+        "reel_video.mp4"
         in manifest_paths
     )
 
