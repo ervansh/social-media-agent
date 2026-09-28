@@ -87,6 +87,24 @@ class Settings(BaseSettings):
     openai_image_background: str = "opaque"
     openai_image_output_compression: int = 90
 
+    comfyui_base_url: str = (
+        "http://127.0.0.1:8188"
+    )
+    comfyui_workflow_path: str = (
+        "config/comfyui/workflow_api.json"
+    )
+    comfyui_model_label: str = (
+        "local-comfyui-workflow"
+    )
+    comfyui_output_node_id: str | None = None
+    comfyui_request_timeout_seconds: int = 30
+    comfyui_generation_timeout_seconds: int = 600
+    comfyui_poll_interval_seconds: float = 0.5
+    comfyui_jpeg_quality: int = 92
+    comfyui_output_prefix: str = (
+        "social_media_agent"
+    )
+
     publishing_mode: str = "dry_run"
 
     media_store_provider: str = "local"
