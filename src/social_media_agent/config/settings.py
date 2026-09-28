@@ -137,7 +137,22 @@ class Settings(BaseSettings):
     creative_storyboard_max_output_tokens: int = 900
 
     instagram_reel_scene_count: int = 5
-    
+
+    video_rendering_enabled: bool = False
+    video_renderer: str = "ffmpeg"
+
+    ffmpeg_binary: str = "ffmpeg"
+
+    reel_scene_duration_seconds: float = 3.0
+    reel_fps: int = 30
+    reel_video_crf: int = 23
+    reel_video_preset: str = "medium"
+    reel_transition_seconds: float = 0.20
+
+    reel_text_font_path: str | None = None
+    reel_text_font_size: int = 72
+    reel_text_margin: int = 96
+
     x_asset_width: int = 1600
     x_asset_height: int = 900
 
