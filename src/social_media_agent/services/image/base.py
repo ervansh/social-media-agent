@@ -22,5 +22,6 @@ class ImageProvider(Protocol):
         prompt: str,
         width: int,
         height: int,
+        negative_prompt: str | None = None,
     ) -> ImageGenerationResult:
         ...
