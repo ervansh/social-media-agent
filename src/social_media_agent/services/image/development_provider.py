@@ -23,6 +23,7 @@ class DevelopmentImageProvider:
         prompt: str,
         width: int,
         height: int,
+        negative_prompt: str | None = None,
     ) -> ImageGenerationResult:
 
         if width <= 0 or height <= 0:
@@ -35,6 +36,13 @@ class DevelopmentImageProvider:
             " ".join(prompt.split())
             or "Generated social media asset"
         )
+
+        if negative_prompt:
+            normalized_prompt = (
+                f"{normalized_prompt} "
+                "Avoid: "
+                f"{' '.join(negative_prompt.split())}"
+            )
 
         digest = hashlib.sha256(
             normalized_prompt.encode("utf-8")
