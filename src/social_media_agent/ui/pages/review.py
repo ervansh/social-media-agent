@@ -118,8 +118,9 @@ def _render_generated_media_preview(
     )
 
     st.caption(
-        "Preview the actual generated JPEG "
-        "assets before approving this run."
+        "Preview the actual generated images "
+        "and Reel video before approving "
+        "this run."
     )
 
     columns = st.columns(3)
