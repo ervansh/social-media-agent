@@ -134,18 +134,157 @@ class ContentPipelineService:
             }
         )
 
+    @staticmethod
+    def _generated_videos_need_refresh(
+        *,
+        generated_payload: dict | None,
+        creative_assets: CreativeAssetBundle,
+        creative_changed: bool,
+        video_rendering_service,
+    ) -> bool:
+
+        storyboards = [
+            storyboard
+            for storyboard
+            in creative_assets.storyboards
+            if (
+                storyboard.platform
+                == "instagram"
+                and storyboard.asset_type
+                == "reel_storyboard"
+            )
+        ]
+
+        if not storyboards:
+            return False
+
+        if generated_payload is None:
+            return True
+
+        if creative_changed:
+            return True
+
+        existing = (
+            GeneratedAssetBundle
+            .model_validate(
+                generated_payload
+            )
+        )
+
+        videos = [
+            video
+            for video
+            in existing.videos
+            if (
+                video.platform
+                == "instagram"
+                and video.storyboard_asset_type
+                == "reel_storyboard"
+            )
+        ]
+
+        if len(videos) != len(storyboards):
+            return True
+
+        return any(
+            (
+                video.provider
+                != video_rendering_service
+                .provider_name
+                or video.model
+                != video_rendering_service
+                .MODEL_NAME
+            )
+            for video
+            in videos
+        )
+
+    def _render_videos_if_needed(
+        self,
+        *,
+        run_id: str,
+        creative_assets: CreativeAssetBundle,
+        creative_changed: bool,
+    ) -> None:
+
+        if (
+            self.video_rendering_service
+            is None
+        ):
+            return
+
+        generated_payload = (
+            self.persistence
+            .get_latest_payload(
+                run_id,
+                ArtifactType.GENERATED_ASSETS,
+            )
+        )
+
+        if not (
+            self._generated_videos_need_refresh(
+                generated_payload=generated_payload,
+                creative_assets=creative_assets,
+                creative_changed=creative_changed,
+                video_rendering_service=(
+                    self.video_rendering_service
+                ),
+            )
+        ):
+            return
+
+        if generated_payload is None:
+            raise ValueError(
+                "Video rendering requires "
+                "generated image assets. Enable "
+                "image generation before Reel "
+                "rendering."
+            )
+
+        generated_assets = (
+            GeneratedAssetBundle
+            .model_validate(
+                generated_payload
+            )
+        )
+
+        rendered = (
+            self.video_rendering_service
+            .render(
+                run_id=run_id,
+                creative_assets=(
+                    creative_assets
+                ),
+                generated_assets=(
+                    generated_assets
+                ),
+            )
+        )
+
+        if (
+            rendered.model_dump()
+            != generated_assets.model_dump()
+        ):
+            self.persistence.save_model(
+                run_id,
+                ArtifactType.GENERATED_ASSETS,
+                rendered,
+            )
+
     def __init__(
         self,
         llm,
         search_provider,
         persistence,
         image_generation_service=None,
+        video_rendering_service=None,
     ):
         self.llm = llm
         self.search_provider = search_provider
         self.persistence = persistence
 
         self.image_generation_service = image_generation_service
+        self.video_rendering_service = video_rendering_service
 
     # ==================================================
     # PHASE 2
@@ -987,6 +1126,12 @@ class ContentPipelineService:
                     ArtifactType.GENERATED_ASSETS,
                     generated_assets,
                 )
+
+        self._render_videos_if_needed(
+            run_id=run_id,
+            creative_assets=creative_assets,
+            creative_changed=True,
+        )
 
         # ==================================================
         # Pipeline successfully reaches Human Review
@@ -1894,6 +2039,12 @@ class ContentPipelineService:
                     ArtifactType.GENERATED_ASSETS,
                     generated_assets,
                 )
+
+        self._render_videos_if_needed(
+            run_id=run_id,
+            creative_assets=creative_assets,
+            creative_changed=creative_changed,
+        )
 
         # ==================================================
         # READY
