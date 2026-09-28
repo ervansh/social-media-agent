@@ -728,13 +728,17 @@ class ManualPublishPackageService:
             [
                 asset
                 for asset
-                in generated.images
+                in [
+                    *generated.images,
+                    *generated.videos,
+                ]
                 if asset.platform
                 in platforms
             ],
             key=lambda asset: (
                 asset.platform,
                 asset.asset_type,
+                asset.storage_key,
             ),
         )
 
