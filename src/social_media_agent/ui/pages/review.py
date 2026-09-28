@@ -98,7 +98,17 @@ def _render_generated_media_preview(
         == "instagram"
     ]
 
-    if not instagram_assets:
+    instagram_videos = [
+        asset
+        for asset in bundle.videos
+        if asset.platform
+        == "instagram"
+    ]
+
+    if (
+        not instagram_assets
+        and not instagram_videos
+    ):
         return
 
     st.divider()
@@ -156,6 +166,49 @@ def _render_generated_media_preview(
             st.caption(
                 f"Provider: {asset.provider} "
                 f"· Model: {asset.model}"
+            )
+
+    if instagram_videos:
+
+        st.subheader(
+            "Generated Instagram Reel"
+        )
+
+        for video in instagram_videos:
+
+            file_path = (
+                _resolve_generated_asset_path(
+                    video.storage_key
+                )
+            )
+
+            if file_path is None:
+
+                st.warning(
+                    "Generated Reel file "
+                    "is unavailable."
+                )
+
+                st.caption(
+                    video.storage_key
+                )
+
+                continue
+
+            st.video(
+                str(file_path)
+            )
+
+            st.caption(
+                f"{video.asset_type} · "
+                f"{video.width}×{video.height} · "
+                f"{video.duration_seconds:.1f}s · "
+                f"{video.fps} fps"
+            )
+
+            st.caption(
+                f"Provider: {video.provider} "
+                f"· Model: {video.model}"
             )
 
 
