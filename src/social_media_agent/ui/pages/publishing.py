@@ -47,15 +47,47 @@ def render():
         for run in runs
     }
 
+    run_ids = list(
+        run_map.keys()
+    )
+
+    session_key = (
+        "publishing_selected_run_id"
+    )
+
+    if (
+        session_key
+        not in st.session_state
+        or st.session_state[
+            session_key
+        ]
+        not in run_map
+    ):
+        st.session_state[
+            session_key
+        ] = run_ids[0]
+
     selected_run_id = st.selectbox(
         "Approved content run",
-        options=list(run_map.keys()),
+        options=run_ids,
+        index=run_ids.index(
+            st.session_state[
+                session_key
+            ]
+        ),
         format_func=lambda run_id: (
             f"{run_map[run_id].topic}"
             f" — "
             f"{run_map[run_id].audience}"
         ),
+        key=(
+            "publishing_run_selector"
+        ),
     )
+
+    st.session_state[
+        session_key
+    ] = selected_run_id
 
     selected_run = run_map[
         selected_run_id
@@ -82,6 +114,34 @@ def render():
     st.caption(
         f"Run ID: {selected_run.id}"
     )
+
+    publication_plan = (
+        persistence.get_latest_payload(
+            selected_run_id,
+            ArtifactType.PUBLICATION_PLAN,
+        )
+    )
+
+    if publication_plan is None:
+        st.error(
+            "This approved run has no "
+            "PublicationPlan. Re-open it in "
+            "Content Review and approve it again "
+            "before packaging or publishing."
+        )
+        publication_plan_id = None
+
+    else:
+        publication_plan_id = (
+            publication_plan.get(
+                "plan_id"
+            )
+        )
+
+        st.caption(
+            "Publication Plan ID: "
+            f"{publication_plan_id}"
+        )
 
     # ==================================================
     # Publishing Mode
@@ -172,6 +232,10 @@ Current publishing support:
     if st.button(
         "Build Manual Publish Package",
         use_container_width=True,
+        disabled=(
+            publication_plan
+            is None
+        ),
         key=(
             "manual_package_"
             f"{selected_run_id}"
@@ -460,6 +524,10 @@ Current publishing support:
         button_text,
         type="primary",
         use_container_width=True,
+        disabled=(
+            publication_plan
+            is None
+        ),
     ):
 
         try:
