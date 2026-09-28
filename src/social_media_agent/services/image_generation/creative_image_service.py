@@ -92,12 +92,6 @@ class CreativeImageGenerationService:
                         f'\"{brief.text_overlay.strip()}\"'
                     )
 
-                if brief.negative_prompt:
-                    prompt_parts.append(
-                        "Avoid the following: "
-                        f"{brief.negative_prompt.strip()}"
-                    )
-
                 prompt = "\n\n".join(
                     prompt_parts
                 )
@@ -107,6 +101,9 @@ class CreativeImageGenerationService:
                         prompt=prompt,
                         width=brief.width,
                         height=brief.height,
+                        negative_prompt=(
+                            brief.negative_prompt
+                        ),
                     )
                 )
 
