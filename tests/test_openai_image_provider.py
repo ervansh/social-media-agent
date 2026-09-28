@@ -158,6 +158,9 @@ def test_openai_provider_generates_valid_jpeg(
         prompt="Create a QA carousel image.",
         width=1080,
         height=1350,
+        negative_prompt=(
+            "clutter, unreadable text"
+        ),
     )
 
     assert result.provider == "openai"
@@ -188,7 +191,11 @@ def test_openai_provider_generates_valid_jpeg(
         "model":
             "gpt-image-2.5-flare",
         "prompt":
-            "Create a QA carousel image.",
+            (
+                "Create a QA carousel image."
+                "\n\nAvoid the following: "
+                "clutter, unreadable text"
+            ),
         "size":
             "1088x1360",
         "quality":
