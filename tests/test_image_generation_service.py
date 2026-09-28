@@ -18,15 +18,20 @@ class FakeImageProvider:
 
     def __init__(self):
         self.prompts = []
+        self.negative_prompts = []
 
     def generate(
         self,
         prompt,
         width,
         height,
+        negative_prompt=None,
     ):
         self.prompts.append(
             prompt
+        )
+        self.negative_prompts.append(
+            negative_prompt
         )
 
         return ImageGenerationResult(
@@ -117,10 +122,13 @@ def test_creative_image_generation_service(
     )
 
     assert (
-        "Avoid the following: "
-        "clutter, unreadable text"
-        in prompt
+        "Avoid the following:"
+        not in prompt
     )
+
+    assert provider.negative_prompts == [
+        "clutter, unreadable text"
+    ]
 
 
 class FailOnSecondImageProvider:
@@ -135,6 +143,7 @@ class FailOnSecondImageProvider:
         prompt,
         width,
         height,
+        negative_prompt=None,
     ):
         self.calls += 1
 
