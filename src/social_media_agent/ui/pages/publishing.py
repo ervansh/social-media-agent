@@ -51,43 +51,34 @@ def render():
         run_map.keys()
     )
 
-    session_key = (
+    selector_key = (
         "publishing_selected_run_id"
     )
 
     if (
-        session_key
+        selector_key
         not in st.session_state
         or st.session_state[
-            session_key
+            selector_key
         ]
         not in run_map
     ):
         st.session_state[
-            session_key
+            selector_key
         ] = run_ids[0]
 
     selected_run_id = st.selectbox(
         "Approved content run",
         options=run_ids,
-        index=run_ids.index(
-            st.session_state[
-                session_key
-            ]
-        ),
         format_func=lambda run_id: (
             f"{run_map[run_id].topic}"
             f" — "
             f"{run_map[run_id].audience}"
+            f" — "
+            f"{run_id[:8]}"
         ),
-        key=(
-            "publishing_run_selector"
-        ),
+        key=selector_key,
     )
-
-    st.session_state[
-        session_key
-    ] = selected_run_id
 
     selected_run = run_map[
         selected_run_id
