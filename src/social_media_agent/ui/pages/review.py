@@ -186,15 +186,35 @@ def render():
         for run in runs
     }
 
+    run_ids = list(
+        run_map.keys()
+    )
+
+    selector_key = (
+        "review_selected_run_id"
+    )
+
+    if (
+        selector_key
+        not in st.session_state
+        or st.session_state[
+            selector_key
+        ]
+        not in run_map
+    ):
+        st.session_state[
+            selector_key
+        ] = run_ids[0]
+
     selected_run_id = st.selectbox(
         "Select content run",
-        options=list(
-            run_map.keys()
-        ),
+        options=run_ids,
         format_func=lambda run_id: (
             f"{run_map[run_id].topic} "
-            f"— {run_map[run_id].status}"
+            f"— {run_map[run_id].status} "
+            f"— {run_id[:8]}"
         ),
+        key=selector_key,
     )
 
     run = run_map[
@@ -220,6 +240,19 @@ def render():
     st.caption(
         f"Run ID: {run.id}"
     )
+
+    publication_plan = (
+        persistence.get_latest_payload(
+            run.id,
+            ArtifactType.PUBLICATION_PLAN,
+        )
+    )
+
+    if publication_plan is not None:
+        st.caption(
+            "Publication Plan ID: "
+            f"{publication_plan.get('plan_id')}"
+        )
 
     artifacts = (
         persistence
@@ -338,6 +371,39 @@ def render():
         ),
     )
 
+    reviewable_statuses = {
+        RunStatus
+        .READY_FOR_HUMAN_REVIEW
+        .value,
+        RunStatus
+        .REQUIRES_REVIEW
+        .value,
+    }
+
+    can_review = (
+        run.status
+        in reviewable_statuses
+    )
+
+    if not can_review:
+        if (
+            run.status
+            == RunStatus
+            .APPROVED_FOR_PUBLISHING
+            .value
+        ):
+            st.info(
+                "This run is already approved. "
+                "Edit a review-sensitive artifact "
+                "to create a new version and move "
+                "the run back to requires_review."
+            )
+        else:
+            st.info(
+                "This run is not currently "
+                "awaiting human review."
+            )
+
     approve_col, reject_col = (
         st.columns(2)
     )
@@ -346,6 +412,7 @@ def render():
         "Approve for Publishing",
         type="primary",
         use_container_width=True,
+        disabled=not can_review,
     ):
 
         try:
@@ -381,6 +448,7 @@ def render():
     if reject_col.button(
         "Reject",
         use_container_width=True,
+        disabled=not can_review,
     ):
 
         review_service.reject(
