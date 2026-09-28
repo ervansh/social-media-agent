@@ -76,6 +76,94 @@ class DeterministicReelRenderer:
             else settings.ffmpeg_binary
         )
 
+        self._validate_settings()
+
+    @staticmethod
+    def _validate_settings(
+    ) -> None:
+
+        if (
+            settings.instagram_reel_width
+            <= 0
+            or settings.instagram_reel_height
+            <= 0
+        ):
+            raise ValueError(
+                "Instagram Reel dimensions "
+                "must be positive."
+            )
+
+        if settings.reel_fps <= 0:
+            raise ValueError(
+                "REEL_FPS must be greater "
+                "than zero."
+            )
+
+        if (
+            settings
+            .reel_scene_duration_seconds
+            <= 0
+        ):
+            raise ValueError(
+                "REEL_SCENE_DURATION_SECONDS "
+                "must be greater than zero."
+            )
+
+        if (
+            settings
+            .reel_transition_seconds
+            < 0
+        ):
+            raise ValueError(
+                "REEL_TRANSITION_SECONDS "
+                "cannot be negative."
+            )
+
+        if not (
+            0
+            <= settings.reel_video_crf
+            <= 51
+        ):
+            raise ValueError(
+                "REEL_VIDEO_CRF must be "
+                "between 0 and 51."
+            )
+
+        if not (
+            settings
+            .reel_video_preset
+            .strip()
+        ):
+            raise ValueError(
+                "REEL_VIDEO_PRESET cannot "
+                "be empty."
+            )
+
+        if (
+            settings
+            .reel_text_font_size
+            <= 0
+        ):
+            raise ValueError(
+                "REEL_TEXT_FONT_SIZE must "
+                "be greater than zero."
+            )
+
+        if (
+            settings.reel_text_margin
+            < 0
+            or (
+                2
+                * settings.reel_text_margin
+                >= settings
+                .instagram_reel_width
+            )
+        ):
+            raise ValueError(
+                "REEL_TEXT_MARGIN must leave "
+                "positive horizontal text space."
+            )
+
     @property
     def provider_name(
         self,
@@ -900,12 +988,16 @@ class DeterministicReelRenderer:
                 )
             )
 
-        return ImageFont.load_default(
-            size=(
-                settings
-                .reel_text_font_size
+        try:
+            return ImageFont.load_default(
+                size=(
+                    settings
+                    .reel_text_font_size
+                )
             )
-        )
+
+        except TypeError:
+            return ImageFont.load_default()
 
     @staticmethod
     def _wrap_text(
