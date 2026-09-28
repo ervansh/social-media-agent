@@ -358,7 +358,10 @@ Current publishing support:
         )
     )
 
-    if instagram_payload is not None:
+    if (
+        instagram_payload is not None
+        and publishing_mode == "live"
+    ):
 
         st.divider()
 
@@ -506,6 +509,18 @@ Current publishing support:
                             media_url,
                             language=None,
                         )
+
+    if (
+        instagram_payload is not None
+        and publishing_mode != "live"
+    ):
+        st.caption(
+            "Instagram live preflight is "
+            "deferred while PUBLISHING_MODE "
+            "is not live. The Manual Publish "
+            "Package is the active delivery "
+            "workflow for this phase."
+        )
 
     # ==================================================
     # Execute publishing
