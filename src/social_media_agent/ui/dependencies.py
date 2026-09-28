@@ -55,6 +55,9 @@ from social_media_agent.services.media_store.factory import (
 from social_media_agent.services.review_service import (
     ReviewService,
 )
+from social_media_agent.services.video.factory import (
+    get_video_renderer,
+)
 
 
 @st.cache_resource
@@ -132,6 +135,9 @@ def get_content_pipeline_service():
         image_generation_service=(
             get_image_generation_service()
         ),
+        video_rendering_service=(
+            get_video_rendering_service()
+        ),
     )
 
 @st.cache_resource
@@ -145,6 +151,15 @@ def get_image_generation_service():
     return CreativeImageGenerationService(
         provider=provider,
     )
+
+
+@st.cache_resource
+def get_video_rendering_service():
+
+    if not settings.video_rendering_enabled:
+        return None
+
+    return get_video_renderer()
 
 # @st.cache_resource
 # def get_publishing_service():
