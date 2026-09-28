@@ -134,6 +134,7 @@ class OpenAIImageProvider:
         prompt: str,
         width: int,
         height: int,
+        negative_prompt: str | None = None,
     ) -> ImageGenerationResult:
 
         if not prompt or not prompt.strip():
@@ -150,9 +151,18 @@ class OpenAIImageProvider:
             height,
         )
 
+        effective_prompt = prompt.strip()
+
+        if negative_prompt:
+            effective_prompt = (
+                f"{effective_prompt}\n\n"
+                "Avoid the following: "
+                f"{negative_prompt.strip()}"
+            )
+
         payload: dict[str, Any] = {
             "model": self.model,
-            "prompt": prompt.strip(),
+            "prompt": effective_prompt,
             "size": (
                 f"{normalized_width}"
                 f"x{normalized_height}"
