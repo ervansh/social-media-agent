@@ -29,12 +29,12 @@ class GeneratedVideoAsset(BaseModel):
     provider: str
     model: str
 
-    width: int
-    height: int
-    fps: int
+    width: int = Field(gt=0)
+    height: int = Field(gt=0)
+    fps: int = Field(gt=0)
 
-    duration_seconds: float
-    scene_count: int
+    duration_seconds: float = Field(gt=0)
+    scene_count: int = Field(gt=0)
 
     source_image_storage_keys: list[str] = Field(
         min_length=1
