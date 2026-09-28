@@ -12,6 +12,7 @@ class DisabledImageProvider:
         prompt: str,
         width: int,
         height: int,
+        negative_prompt: str | None = None,
     ) -> ImageGenerationResult:
 
         raise RuntimeError(
